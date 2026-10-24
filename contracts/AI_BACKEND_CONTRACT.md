@@ -1,591 +1,592 @@
-# AI ↔ Backend Contract
+# AI ↔ Backend Shared Contract (`AI_BACKEND_CONTRACT.md`)
 
-**Version:** 0.1.0  
-**Status:** Draft — awaiting review by AI lead and Backend lead  
-**Last updated:** 2026-10-24
-
-This document is the single source of truth for every call the backend makes into the
-AI module.  It is language-neutral: all shapes are described as JSON; both sides must
-honour them exactly.
-
-> [!IMPORTANT]
-> **Hard constraints on the AI module (non-negotiable)**
-> - The model MUST NOT execute SQL or issue database write commands.
-> - The model MUST NOT delete, overwrite, or move any stored data.
-> - The model MUST NOT send emails, webhooks, or external HTTP requests.
-> - The model MUST NOT shut down or restart any system process.
-> - Raw personal data (real names, real Aadhaar numbers, real phone numbers, etc.)
->   MUST NOT appear in logs, traces, or prompt caches.  Pass only anonymised
->   or synthetic values during development and testing.
-
-> [!NOTE]
-> **Division of responsibility**
->
-> | Concern | Owner |
-> |---|---|
-> | File upload, virus scan, storage | Backend |
-> | ETL, normalisation, column-type inference | Backend |
-> | Deterministic identifier validation (Luhn, Aadhaar checksum, PAN regex) | Backend |
-> | Database persistence and version history | Backend |
-> | Privacy-request case management (status, deadlines) | Backend |
-> | Breach incident records and audit log | Backend |
-> | Authentication, authorisation, rate-limiting | Backend |
-> | Contextual data classification, explanations | AI module |
-> | Privacy-issue detection and risk reasoning | AI module |
-> | Privacy-request intent classification | AI module |
-> | Breach-detail extraction from free text | AI module |
+**Contract Version:** `1.0.0`  
+**Status:** Draft / Active  
+**Regulatory Context:** India Digital Personal Data Protection (DPDP) Act, 2023 & Information Technology (IT) Act, 2000 / CERT-In Directions.
 
 ---
 
-## Common envelope
+## 1. Architectural Boundaries & Responsibilities
 
-Every AI call uses the same request/response envelope.
+This document defines the language-neutral JSON interface between the **Backend Module** (`backend/`) and the **AI / SLM Module** (`ai/`).
 
-### Request envelope
-
-```json
-{
-  "task":    "<task_name>",
-  "version": "1",
-  "payload": { }
-}
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `task` | string | ✅ | One of the task names in this document |
-| `version` | string | ✅ | Contract version the caller is using (currently `"1"`) |
-| `payload` | object | ✅ | Task-specific fields — see each task section |
-
-### Response envelope
-
-```json
-{
-  "task":                "<task_name>",
-  "version":             "1",
-  "status":              "ok",
-  "needs_human_review":  false,
-  "result":              { },
-  "warnings":            [],
-  "error":               null
-}
-```
-
-| Field | Type | Notes |
+| Component | Owned Responsibilities | Out of Scope |
 |---|---|---|
-| `task` | string | Echoed from the request |
-| `version` | string | Contract version used by the AI module |
-| `status` | `"ok"` \| `"error"` | Top-level outcome |
-| `needs_human_review` | boolean | `true` forces the backend to route the result to a human queue before any automated action is taken |
-| `result` | object \| `null` | Populated when `status` is `"ok"`; `null` on error |
-| `warnings` | array of string | Non-fatal observations (e.g. low-confidence predictions) |
-| `error` | object \| `null` | Populated when `status` is `"error"`; `null` on success |
-
-### Error object
-
-```json
-{
-  "code":    "UNSUPPORTED_LANGUAGE",
-  "message": "Human-readable explanation safe to log"
-}
-```
-
-**Standard error codes**
-
-| Code | Meaning |
-|---|---|
-| `INVALID_INPUT` | A required field is missing or has a wrong type |
-| `UNSUPPORTED_LANGUAGE` | Column headers or text are in a language the model cannot handle |
-| `CONTEXT_TOO_LONG` | Payload exceeds the model's context window |
-| `LOW_CONFIDENCE` | Model confidence is below the acceptable threshold; treat result as unreliable |
-| `MODEL_UNAVAILABLE` | Ollama server did not respond |
-| `INTERNAL_ERROR` | Unexpected error inside the AI module |
+| **Backend (`backend/`)** | File upload, ETL & parsing, deterministic identifier validation (regex/checksums for PAN, Aadhaar format, GSTIN, phone, email), database persistence, dataset version comparison, privacy request case lifecycle, incident records, authentication, and authorization. | Running SLM prompts or directly invoking model weights. |
+| **AI / SLM (`ai/`)** | Contextual column classification, contextual privacy risk findings, data principal request classification, breach incident detail extraction, and generating plain-language explanations via local on-device inference (Ollama). | Executing SQL, mutating databases, deleting data, sending emails/notifications, reading uploaded files directly, or enforcing auth. |
 
 ---
 
-## Task 1 — `classify_columns`
+## 2. Hard Safety & Privacy Guardrails
 
-**Purpose:** Given a list of dataset column descriptors (name, sample values, data type)
-already cleaned by the backend's ETL pipeline, the AI module returns a privacy
-classification for each column.
+1. **No Autonomous Side Effects:** The AI module is strictly a **stateless, read-only inference function** (`JSON In -> JSON Out`). Never allow the model to execute arbitrary SQL, delete or modify database records, send emails/messages, invoke external webhooks, or shut down/reconfigure systems.
+2. **Zero Raw Personal Data Logging:** Neither the AI module nor the backend adapter may log raw personal data (PII) in application logs, trace files, or prompt debug dumps. Sample values passed to the AI module should be truncated, masked, or tokenized by the backend ETL pipeline where possible.
+3. **Deterministic First, Contextual Second:** The backend performs deterministic pattern/checksum validation (`deterministic_signals`) first and passes those signals into the AI module as context. The AI module resolves ambiguous context (e.g. distinguishing a customer's emergency contact phone from a vendor helpdesk number).
+4. **Synthetic Examples Only:** All documentation, contract fixtures, and tests must strictly use synthetic, non-real Indian identifiers and fictional entities.
 
-> [!NOTE]
-> The backend performs deterministic Aadhaar/PAN/phone-number format checks
-> **before** calling this task.  The AI module adds contextual reasoning on top.
+---
 
-### `needs_human_review` triggers
+## 3. Common Conventions & Error Representation
 
-`needs_human_review` MUST be `true` when:
-- Any column has `confidence` < `0.70`.
-- Any column is classified `SENSITIVE_PERSONAL_DATA`.
-- The model detects a column that looks like a unique biometric identifier.
+### 3.1 Common Envelope Metadata
+Every task request and response includes:
+- `schema_version` (`string`, required): Contract version, currently `"1.0"`.
+- `request_id` (`string`, required): UUID/ULID generated by the backend for correlation (safe to log; contains no PII).
+- `task` (`string`, required): One of `"classify_columns"`, `"contextual_privacy_findings"`, `"classify_privacy_request"`, `"extract_breach_details"`.
 
-### Request payload
+### 3.2 Standard Error Representation
+If the AI module fails to process a request (e.g., invalid input schema, local Ollama service unreachable, malformed model output after retry, or context length exceeded), it must return a structured error envelope rather than throwing an unhandled exception:
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `dataset_id` | string | ✅ | Opaque ID assigned by the backend (no PII) |
-| `columns` | array | ✅ | 1–200 column descriptors |
-| `columns[].name` | string | ✅ | Column header as it appears in the file |
-| `columns[].inferred_type` | string | ✅ | Backend's ETL type hint — see permitted values |
-| `columns[].sample_values` | array of string | ✅ | 3–5 synthetic/anonymised sample values |
-| `columns[].description` | string | ❌ | Optional human note about the column |
-
-**Permitted `inferred_type` values**
-
-`TEXT` · `INTEGER` · `FLOAT` · `DATE` · `DATETIME` · `BOOLEAN` · `EMAIL` · `PHONE` · `URL` · `UNKNOWN`
-
-### Response result
-
-| Field | Type | Notes |
-|---|---|---|
-| `classifications` | array | One entry per input column, same order |
-| `classifications[].column_name` | string | Echoed from input |
-| `classifications[].category` | string | See permitted values |
-| `classifications[].sensitivity` | string | See permitted values |
-| `classifications[].confidence` | float | 0.0 – 1.0 |
-| `classifications[].explanation` | string | ≤ 200 chars, safe to display |
-| `classifications[].dpdp_basis` | string \| `null` | Relevant DPDP Act clause if applicable, e.g. `"Section 2(t)"` |
-
-**Permitted `category` values**
-
-| Value | Meaning |
-|---|---|
-| `IDENTITY` | Name, date of birth, gender, photograph |
-| `GOVERNMENT_ID` | Aadhaar, PAN, Voter ID, Passport, Driving Licence |
-| `CONTACT` | Address, email, phone number |
-| `FINANCIAL` | Bank account, credit card, salary, transaction |
-| `HEALTH` | Medical record, diagnosis, prescription |
-| `BIOMETRIC` | Fingerprint, iris, face geometry |
-| `LOCATION` | GPS coordinates, IP address, device ID |
-| `BEHAVIOURAL` | Browsing history, purchase pattern, usage log |
-| `EMPLOYMENT` | Job title, employer, performance review |
-| `NON_PERSONAL` | Data that cannot identify a natural person |
-| `UNCERTAIN` | Model is not confident enough to categorise |
-
-**Permitted `sensitivity` values**
-
-| Value | Meaning |
-|---|---|
-| `SENSITIVE_PERSONAL_DATA` | DPDP Act special category / IT Rules Schedule II |
-| `PERSONAL_DATA` | Identifiable but not in the sensitive category |
-| `NON_PERSONAL_DATA` | Cannot identify a natural person |
-
-### Synthetic example
-
-**Request**
 ```json
 {
+  "schema_version": "1.0",
+  "request_id": "req_01J8Z9K4X2M8P9Q3R7T6V5W4Y3",
   "task": "classify_columns",
-  "version": "1",
-  "payload": {
-    "dataset_id": "ds_20261024_001",
-    "columns": [
-      {
-        "name": "customer_name",
-        "inferred_type": "TEXT",
-        "sample_values": ["Rahul Sharma", "Priya Nair", "Amit Desai"],
-        "description": "Full name of the customer"
-      },
-      {
-        "name": "aadhar_last4",
-        "inferred_type": "INTEGER",
-        "sample_values": ["1234", "5678", "9012"],
-        "description": "Last 4 digits of Aadhaar, stored for verification"
-      },
-      {
-        "name": "purchase_amount_inr",
-        "inferred_type": "FLOAT",
-        "sample_values": ["499.00", "1299.50", "89.99"],
-        "description": null
-      }
-    ]
-  }
+  "status": "error",
+  "error": {
+    "code": "MODEL_OUTPUT_INVALID",
+    "message": "SLM output failed JSON schema validation after 2 retries.",
+    "retryable": true,
+    "details": {
+      "failed_stage": "response_validation",
+      "reason": "Missing required field 'sensitivity_tier' on column 'cust_pan_no'"
+    }
+  },
+  "needs_human_review": true,
+  "review_reasons": [
+    "AI inference failed with MODEL_OUTPUT_INVALID; manual classification required."
+  ]
 }
 ```
 
-**Response**
+#### Permitted `error.code` Values
+| Error Code | Retryable | Description |
+|---|---|---|
+| `INVALID_INPUT` | `false` | Backend payload is missing required fields or violates contract types. |
+| `MODEL_UNAVAILABLE` | `true` | Local Ollama server is unreachable or model is not loaded. |
+| `INFERENCE_TIMEOUT` | `true` | Local SLM inference exceeded the configured timeout threshold. |
+| `CONTEXT_LENGTH_EXCEEDED` | `false` | Input payload exceeds the SLM context window. |
+| `MODEL_OUTPUT_INVALID` | `true` | Model returned unparseable JSON or disallowed enum values. |
+| `SAFETY_POLICY_BLOCKED` | `false` | Input or output triggered a safety guardrail (e.g., prompt injection attempt). |
+| `INTERNAL_AI_ERROR` | `false` | Unexpected internal error inside the `ai/` module. |
+
+> **Rule:** On any `"status": "error"` response, `needs_human_review` **must** be `true`.
+
+---
+
+## 4. Task Specifications
+
+---
+
+### Task 1: `classify_columns`
+
+Classifies dataset columns into privacy categories and DPDP sensitivity tiers using column names, data types, backend-supplied deterministic signals, and masked/synthetic sample values.
+
+#### Required Input Fields
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`): Unique correlation ID
+- `task` (`string`): `"classify_columns"`
+- `dataset_context` (`object`):
+  - `dataset_id` (`string`): Backend identifier for the dataset/table
+  - `dataset_name` (`string`): Table or file name (e.g., `"customer_kyc_export.csv"`)
+  - `business_domain` (`string`): Brief business domain context (e.g., `"retail_pharmacy"`, `"lending_fintech"`, `"clinic"`)
+- `columns` (`array<object>`, min 1 item):
+  - `column_name` (`string`): Original column header
+  - `inferred_data_type` (`string`): Allowed: `"string"`, `"integer"`, `"float"`, `"boolean"`, `"date"`, `"datetime"`, `"json"`, `"unknown"`
+  - `null_ratio` (`number`): `0.0` to `1.0`
+  - `deterministic_signals` (`array<string>`): Pattern hits computed by backend ETL. Allowed values:
+    - `"AADHAAR_PATTERN"`, `"PAN_PATTERN"`, `"GSTIN_PATTERN"`, `"INDIAN_PHONE_PATTERN"`, `"EMAIL_PATTERN"`, `"PINCODE_PATTERN"`, `"IFSC_PATTERN"`, `"UPI_ID_PATTERN"`, `"DOB_PATTERN"`, `"IPV4_PATTERN"`, `"NONE"`
+  - `masked_samples` (`array<string>`, max 5 items): Pre-masked or format-preserving synthetic sample tokens from backend ETL (never raw unmasked PII).
+
+#### Output Fields & Allowed Values
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"classify_columns"`
+- `status` (`string`): `"ok"` | `"error"`
+- `needs_human_review` (`boolean`): Top-level flag (`true` if any column requires human review)
+- `review_reasons` (`array<string>`): Top-level summary of why human review is required (empty array `[]` if `needs_human_review` is `false`)
+- `results` (`array<object>`):
+  - `column_name` (`string`)
+  - `contains_personal_data` (`boolean`)
+  - `data_category` (`string`): Allowed values:
+    - `"GOVERNMENT_ID"` (Aadhaar, PAN, Passport, Voter ID, Driving Licence)
+    - `"CONTACT_INFO"` (Email, phone number, residential address, PIN code)
+    - `"IDENTITY_DEMOGRAPHIC"` (Full name, date of birth, gender, parent/spouse name)
+    - `"FINANCIAL_DATA"` (Bank account, IFSC, UPI ID, card token, salary, loan/tax details)
+    - `"HEALTH_MEDICAL"` (Diagnosis, prescription, lab results, disability status)
+    - `"CHILDREN_DATA"` (Personal data belonging to an individual under 18 years of age)
+    - `"BIOMETRIC_GENETIC"` (Fingerprint metadata, facial template, iris scan reference)
+    - `"AUTHENTICATION_SECRET"` (Password hash, OTP, PIN, session token)
+    - `"BEHAVIORAL_LOCATION"` (IP address, GPS coordinates, device ID, purchase history)
+    - `"BUSINESS_NON_PERSONAL"` (Company GSTIN, SKU, invoice total, internal system timestamps)
+    - `"UNKNOWN_AMBIGUOUS"` (Insufficient signal to classify confidently)
+  - `specific_identifier_type` (`string`): Allowed values:
+    - `"AADHAAR"`, `"PAN"`, `"PASSPORT"`, `"VOTER_ID"`, `"DRIVING_LICENCE"`, `"GSTIN"`, `"PHONE_NUMBER"`, `"EMAIL_ADDRESS"`, `"POSTAL_ADDRESS"`, `"PINCODE"`, `"PERSON_NAME"`, `"DATE_OF_BIRTH"`, `"GENDER"`, `"BANK_ACCOUNT"`, `"IFSC_CODE"`, `"UPI_ID"`, `"PAYMENT_CARD"`, `"MEDICAL_RECORD"`, `"MINOR_INDICATOR"`, `"AUTH_CREDENTIAL"`, `"IP_ADDRESS"`, `"OTHER_PERSONAL"`, `"NON_PERSONAL"`, `"UNKNOWN"`
+  - `sensitivity_tier` (`string`): Allowed values:
+    - `"CRITICAL_PERSONAL"` (High-harm identifiers/secrets: Aadhaar, PAN, raw financial credentials, health/biometric, children's personal data, auth secrets)
+    - `"SENSITIVE_PERSONAL"` (Financial profile, detailed location, demographic + contact combinations)
+    - `"GENERAL_PERSONAL"` (Name, email, phone, general contact/Identifiers)
+    - `"NON_PERSONAL"` (Aggregated, system, or purely corporate data)
+    - `"UNKNOWN"`
+  - `confidence` (`number`): Float in `[0.0, 1.0]`
+  - `explanation` (`string`): Plain-language explanation for the business user (1–2 sentences)
+  - `needs_human_review` (`boolean`)
+  - `review_reasons` (`array<string>`)
+
+#### When `needs_human_review` MUST be `true`
+1. `confidence < 0.75` on any column.
+2. `data_category` is `"UNKNOWN_AMBIGUOUS"` or `sensitivity_tier` is `"UNKNOWN"`.
+3. Conflict between `deterministic_signals` from the backend and the semantic meaning of `column_name` (e.g., `deterministic_signals` has `"INDIAN_PHONE_PATTERN"` but column is named `order_reference_no`).
+4. Any column classified as `"CHILDREN_DATA"`, `"BIOMETRIC_GENETIC"`, `"HEALTH_MEDICAL"`, or `"AUTHENTICATION_SECRET"`.
+5. Free-text columns (e.g. `notes`, `remarks`, `comments`) that may contain embedded unvalidated PII.
+
+#### Synthetic Example (`classify_columns`)
+
+**Request:**
 ```json
 {
+  "schema_version": "1.0",
+  "request_id": "req_col_9001",
   "task": "classify_columns",
-  "version": "1",
+  "dataset_context": {
+    "dataset_id": "ds_402",
+    "dataset_name": "patient_onboarding_v2.csv",
+    "business_domain": "diagnostic_clinic"
+  },
+  "columns": [
+    {
+      "column_name": "kyc_pan_card",
+      "inferred_data_type": "string",
+      "null_ratio": 0.05,
+      "deterministic_signals": ["PAN_PATTERN"],
+      "masked_samples": ["ABCDE1234F", "PQRSX9876Z"]
+    },
+    {
+      "column_name": "doctor_notes_freeform",
+      "inferred_data_type": "string",
+      "null_ratio": 0.30,
+      "deterministic_signals": ["INDIAN_PHONE_PATTERN"],
+      "masked_samples": [
+        "Patient fasting blood sugar high; call spouse at 98XXXXXX10",
+        "Mild hypertension noted, follow up in 2 weeks"
+      ]
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_col_9001",
+  "task": "classify_columns",
   "status": "ok",
   "needs_human_review": true,
-  "result": {
-    "classifications": [
-      {
-        "column_name": "customer_name",
-        "category": "IDENTITY",
-        "sensitivity": "PERSONAL_DATA",
-        "confidence": 0.97,
-        "explanation": "Full name directly identifies a natural person.",
-        "dpdp_basis": "Section 2(t)"
-      },
-      {
-        "column_name": "aadhar_last4",
-        "category": "GOVERNMENT_ID",
-        "sensitivity": "SENSITIVE_PERSONAL_DATA",
-        "confidence": 0.91,
-        "explanation": "Partial Aadhaar number is still a government identifier fragment.",
-        "dpdp_basis": "Section 2(t), IT Rules Schedule II"
-      },
-      {
-        "column_name": "purchase_amount_inr",
-        "category": "FINANCIAL",
-        "sensitivity": "PERSONAL_DATA",
-        "confidence": 0.82,
-        "explanation": "Transaction amount linked to a customer record is personal financial data.",
-        "dpdp_basis": null
-      }
-    ]
-  },
-  "warnings": [],
-  "error": null
-}
-```
-
-> `needs_human_review` is `true` because `aadhar_last4` is `SENSITIVE_PERSONAL_DATA`.
-
----
-
-## Task 2 — `contextual_privacy_findings`
-
-**Purpose:** Given a description of a data flow or processing activity (supplied as
-structured metadata by the backend), the AI module identifies privacy issues and
-explains them in plain language suitable for a non-lawyer business owner.
-
-> [!NOTE]
-> The backend is responsible for building this metadata from its data-asset catalogue.
-> The AI module does not query the database directly.
-
-### `needs_human_review` triggers
-
-`needs_human_review` MUST be `true` when:
-- Any finding has `severity` of `HIGH` or `CRITICAL`.
-- The model detects cross-border data transfer of sensitive personal data.
-- Total number of findings is ≥ 5.
-
-### Request payload
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `activity_id` | string | ✅ | Opaque ID for this processing activity |
-| `activity_name` | string | ✅ | Human-readable label, e.g. `"Customer loyalty programme"` |
-| `purpose` | string | ✅ | Declared purpose of processing, ≤ 500 chars |
-| `data_categories` | array of string | ✅ | Categories from `classify_columns` permitted values |
-| `recipients` | array of string | ❌ | Who the data is shared with (role labels, no personal names) |
-| `retention_days` | integer \| `null` | ❌ | How long data is kept; `null` means unspecified |
-| `cross_border` | boolean | ✅ | Whether data leaves India |
-| `consent_collected` | boolean | ✅ | Whether explicit consent is obtained |
-| `legal_basis` | string \| `null` | ❌ | Claimed legal basis, e.g. `"Legitimate use"`, `"Consent"` |
-
-### Response result
-
-| Field | Type | Notes |
-|---|---|---|
-| `findings` | array | May be empty if no issues are found |
-| `findings[].finding_id` | string | Stable short ID, e.g. `"F-001"` |
-| `findings[].title` | string | ≤ 80 chars |
-| `findings[].description` | string | Plain-language explanation, ≤ 500 chars |
-| `findings[].severity` | string | See permitted values |
-| `findings[].category` | string | See permitted values |
-| `findings[].recommendation` | string | Actionable suggestion, ≤ 300 chars |
-| `findings[].dpdp_reference` | string \| `null` | Applicable DPDP / IT Act clause |
-| `summary` | string | 1–3 sentence plain-language summary of overall risk |
-
-**Permitted `severity` values** (ascending risk)
-
-`INFORMATIONAL` · `LOW` · `MEDIUM` · `HIGH` · `CRITICAL`
-
-**Permitted `category` values**
-
-`CONSENT` · `DATA_MINIMISATION` · `RETENTION` · `CROSS_BORDER_TRANSFER` · `PURPOSE_LIMITATION` · `SECURITY` · `RIGHTS_FACILITATION` · `TRANSPARENCY` · `OTHER`
-
-### Synthetic example
-
-**Request**
-```json
-{
-  "task": "contextual_privacy_findings",
-  "version": "1",
-  "payload": {
-    "activity_id": "act_20261024_007",
-    "activity_name": "Monthly newsletter send",
-    "purpose": "Send promotional emails to customers who purchased in the last 90 days.",
-    "data_categories": ["CONTACT", "BEHAVIOURAL", "IDENTITY"],
-    "recipients": ["email_service_provider"],
-    "retention_days": null,
-    "cross_border": true,
-    "consent_collected": false,
-    "legal_basis": null
-  }
-}
-```
-
-**Response**
-```json
-{
-  "task": "contextual_privacy_findings",
-  "version": "1",
-  "status": "ok",
-  "needs_human_review": true,
-  "result": {
-    "findings": [
-      {
-        "finding_id": "F-001",
-        "title": "No consent basis for marketing emails",
-        "description": "Sending promotional emails requires a valid legal basis under the DPDP Act. No consent or other recognised basis has been specified.",
-        "severity": "HIGH",
-        "category": "CONSENT",
-        "recommendation": "Collect explicit opt-in consent before adding customers to the newsletter list, and provide a clear unsubscribe mechanism.",
-        "dpdp_reference": "Section 6, DPDP Act 2023"
-      },
-      {
-        "finding_id": "F-002",
-        "title": "No data retention limit defined",
-        "description": "Retention period is unspecified. Data should not be kept longer than necessary for the stated purpose.",
-        "severity": "MEDIUM",
-        "category": "RETENTION",
-        "recommendation": "Define and enforce a maximum retention period; delete or anonymise records after that period.",
-        "dpdp_reference": "Section 8(7), DPDP Act 2023"
-      },
-      {
-        "finding_id": "F-003",
-        "title": "Cross-border transfer to email service provider",
-        "description": "Contact and identity data is being shared with an external email provider potentially outside India without a documented transfer safeguard.",
-        "severity": "HIGH",
-        "category": "CROSS_BORDER_TRANSFER",
-        "recommendation": "Verify whether the provider's servers are in India or in a government-approved jurisdiction; document the safeguard.",
-        "dpdp_reference": "Section 16, DPDP Act 2023"
-      }
-    ],
-    "summary": "This activity has two HIGH-severity issues: missing consent and undocumented cross-border transfer. Immediate action is recommended before the next send."
-  },
-  "warnings": [],
-  "error": null
-}
-```
-
-> `needs_human_review` is `true` because two findings have severity `HIGH`.
-
----
-
-## Task 3 — `classify_privacy_request`
-
-**Purpose:** Given the raw text of a data principal's rights request (e.g. submitted
-via a web form), the AI module identifies the request type(s), the likely data subject,
-and whether the text is clear enough for automated processing.
-
-> [!NOTE]
-> The backend owns case creation, SLA timers, identity verification, and fulfilment
-> workflow.  The AI module only interprets the natural-language text.
-
-### `needs_human_review` triggers
-
-`needs_human_review` MUST be `true` when:
-- `confidence` < `0.75`.
-- More than one request type is detected (`is_composite` is `true`).
-- `urgency` is `HIGH` (e.g. text mentions legal action or regulatory complaint).
-- The text contains apparent threats or distressing content.
-
-### Request payload
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `request_id` | string | ✅ | Opaque ID assigned by the backend |
-| `raw_text` | string | ✅ | Verbatim text submitted by the data principal; ≤ 5 000 chars |
-| `submission_channel` | string | ❌ | `"web_form"` \| `"email"` \| `"walk_in"` \| `"other"` |
-| `language_hint` | string | ❌ | BCP-47 language tag, e.g. `"en"`, `"hi"`, `"ta"` |
-
-### Response result
-
-| Field | Type | Notes |
-|---|---|---|
-| `request_types` | array of string | One or more values from the permitted list |
-| `is_composite` | boolean | `true` when more than one distinct right is requested |
-| `confidence` | float | 0.0 – 1.0; applies to the primary type |
-| `urgency` | string | `"LOW"` \| `"MEDIUM"` \| `"HIGH"` |
-| `subject_reference` | string \| `null` | How the data principal referred to themselves (e.g. `"account holder"`) — no raw PII |
-| `data_scope_hint` | string \| `null` | What data the request appears to concern, in general terms |
-| `suggested_response_outline` | string | Draft outline (not a final response); ≤ 400 chars |
-| `ambiguities` | array of string | Questions a human agent should clarify with the requester |
-
-**Permitted `request_types` values**
-
-| Value | Right under DPDP Act |
-|---|---|
-| `ACCESS` | Right to obtain a summary of personal data held |
-| `CORRECTION` | Right to correct inaccurate personal data |
-| `ERASURE` | Right to erase personal data |
-| `NOMINATION` | Right to nominate a person to exercise rights on death |
-| `WITHDRAW_CONSENT` | Right to withdraw previously given consent |
-| `GRIEVANCE` | General complaint or grievance |
-| `UNKNOWN` | Cannot determine the request type |
-
-### Synthetic example
-
-**Request**
-```json
-{
-  "task": "classify_privacy_request",
-  "version": "1",
-  "payload": {
-    "request_id": "req_20261024_042",
-    "raw_text": "Hello, I am a customer and I want to know what personal information you have stored about me. Also, my phone number has changed and I need you to update it in your records. Please confirm once done.",
-    "submission_channel": "web_form",
-    "language_hint": "en"
-  }
-}
-```
-
-**Response**
-```json
-{
-  "task": "classify_privacy_request",
-  "version": "1",
-  "status": "ok",
-  "needs_human_review": true,
-  "result": {
-    "request_types": ["ACCESS", "CORRECTION"],
-    "is_composite": true,
-    "confidence": 0.93,
-    "urgency": "LOW",
-    "subject_reference": "customer",
-    "data_scope_hint": "All stored personal data; specifically the phone number field",
-    "suggested_response_outline": "Acknowledge receipt. Send a data summary within the statutory period. Separately process the phone-number correction request after verifying the requester's identity.",
-    "ambiguities": [
-      "Requester has not provided an account identifier — backend should ask for one to locate the correct record.",
-      "New phone number is not included in the text — backend must collect it during identity verification."
-    ]
-  },
-  "warnings": [],
-  "error": null
-}
-```
-
-> `needs_human_review` is `true` because `is_composite` is `true`.
-
----
-
-## Task 4 — `extract_breach_details`
-
-**Purpose:** Given a free-text incident report written by staff (e.g. an email, a
-Slack message pasted into the form, or an internal ticket), the AI module extracts
-structured breach metadata to pre-populate the incident record.
-
-> [!IMPORTANT]
-> This is an extraction aid only.  All extracted values MUST be reviewed and confirmed
-> by a human before the incident record is finalised or any notification is sent.
-
-### `needs_human_review` triggers
-
-`needs_human_review` is **always `true`** for this task — no exceptions.  Breach
-response always requires human confirmation.
-
-### Request payload
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `incident_ref` | string | ✅ | Opaque reference ID from the backend |
-| `report_text` | string | ✅ | Raw internal incident report; ≤ 10 000 chars |
-| `reporter_role` | string | ❌ | Role of the person filing the report (e.g. `"store_manager"`) — no personal names |
-| `report_timestamp` | string | ❌ | ISO 8601 timestamp when the report was filed |
-
-### Response result
-
-| Field | Type | Notes |
-|---|---|---|
-| `incident_type` | string | See permitted values |
-| `discovery_datetime_hint` | string \| `null` | Best-guess ISO 8601 datetime extracted from the text; `null` if not found |
-| `affected_data_categories` | array of string | Subset of `classify_columns` category values |
-| `estimated_affected_count` | integer \| `null` | Best-guess number of affected data principals; `null` if not stated |
-| `count_confidence` | string | `"EXACT"` \| `"ESTIMATE"` \| `"UNKNOWN"` |
-| `potential_harm` | array of string | See permitted values |
-| `containment_steps_mentioned` | array of string | Steps already taken as described in the text |
-| `notification_likely_required` | boolean | Model's assessment of whether regulatory notification may be needed |
-| `notification_reasoning` | string | Plain-language explanation, ≤ 300 chars |
-| `draft_summary` | string | 3–5 sentence incident summary draft; ≤ 600 chars |
-| `open_questions` | array of string | Gaps the human reviewer must fill in |
-
-**Permitted `incident_type` values**
-
-`UNAUTHORISED_ACCESS` · `DATA_LEAK` · `RANSOMWARE` · `INSIDER_THREAT` · `LOST_DEVICE` · `PHISHING` · `ACCIDENTAL_DISCLOSURE` · `SYSTEM_MISCONFIGURATION` · `UNKNOWN`
-
-**Permitted `potential_harm` values**
-
-`IDENTITY_THEFT` · `FINANCIAL_LOSS` · `REPUTATIONAL_DAMAGE` · `DISCRIMINATION` · `PHYSICAL_HARM` · `EMOTIONAL_DISTRESS` · `LOSS_OF_CONFIDENTIALITY` · `UNKNOWN`
-
-### Synthetic example
-
-**Request**
-```json
-{
-  "task": "extract_breach_details",
-  "version": "1",
-  "payload": {
-    "incident_ref": "inc_20261024_003",
-    "report_text": "Hi team, just noticed that our customer database backup file was accidentally uploaded to a public S3 bucket this morning around 9 AM. The file contains customer names, email addresses, and phone numbers for roughly 3,000 customers from our Delhi store. I've already made the bucket private again and removed the file. Not sure how long it was public. Please advise on next steps.",
-    "reporter_role": "store_manager",
-    "report_timestamp": "2026-10-24T09:47:00+05:30"
-  }
-}
-```
-
-**Response**
-```json
-{
-  "task": "extract_breach_details",
-  "version": "1",
-  "status": "ok",
-  "needs_human_review": true,
-  "result": {
-    "incident_type": "ACCIDENTAL_DISCLOSURE",
-    "discovery_datetime_hint": "2026-10-24T09:00:00+05:30",
-    "affected_data_categories": ["IDENTITY", "CONTACT"],
-    "estimated_affected_count": 3000,
-    "count_confidence": "ESTIMATE",
-    "potential_harm": [
-      "IDENTITY_THEFT",
-      "LOSS_OF_CONFIDENTIALITY",
-      "REPUTATIONAL_DAMAGE"
-    ],
-    "containment_steps_mentioned": [
-      "S3 bucket access set back to private",
-      "Backup file removed from the bucket"
-    ],
-    "notification_likely_required": true,
-    "notification_reasoning": "Approximately 3,000 data principals' contact and identity data was exposed publicly. The DPDP Act and IT Rules require notification to the Data Protection Board and affected individuals when a breach is likely to cause harm.",
-    "draft_summary": "On 2026-10-24 at approximately 09:00 IST, a customer database backup containing names, email addresses, and phone numbers of an estimated 3,000 customers from the Delhi store was inadvertently made publicly accessible via a cloud storage bucket. The exposure was discovered and contained by the reporting manager, who restricted access and deleted the file. The duration of public exposure is currently unknown. Regulatory notification obligations are likely to apply.",
-    "open_questions": [
-      "Exact duration for which the bucket was publicly accessible is unknown — check cloud access logs.",
-      "Confirm whether the backup was encrypted at rest.",
-      "Determine whether any third party accessed or downloaded the file during the exposure window.",
-      "Check if financial or government-ID data was also present in the backup."
-    ]
-  },
-  "warnings": [
-    "Duration of exposure could not be determined from the report text. This materially affects notification timelines."
+  "review_reasons": [
+    "Column 'doctor_notes_freeform' is classified as HEALTH_MEDICAL and contains embedded contact numbers in free text."
   ],
-  "error": null
+  "results": [
+    {
+      "column_name": "kyc_pan_card",
+      "contains_personal_data": true,
+      "data_category": "GOVERNMENT_ID",
+      "specific_identifier_type": "PAN",
+      "sensitivity_tier": "CRITICAL_PERSONAL",
+      "confidence": 0.98,
+      "explanation": "Column name and deterministic pattern match Indian Permanent Account Number (PAN).",
+      "needs_human_review": false,
+      "review_reasons": []
+    },
+    {
+      "column_name": "doctor_notes_freeform",
+      "contains_personal_data": true,
+      "data_category": "HEALTH_MEDICAL",
+      "specific_identifier_type": "MEDICAL_RECORD",
+      "sensitivity_tier": "CRITICAL_PERSONAL",
+      "confidence": 0.84,
+      "explanation": "Free-text clinical notes containing medical observations and embedded emergency contact phone numbers.",
+      "needs_human_review": true,
+      "review_reasons": [
+        "Contains HEALTH_MEDICAL category data.",
+        "Free-text field contains embedded INDIAN_PHONE_PATTERN values."
+      ]
+    }
+  ]
 }
 ```
 
-> `needs_human_review` is always `true` for `extract_breach_details`.
+---
+
+### Task 2: `contextual_privacy_findings`
+
+Evaluates a dataset's classified columns, storage/sharing metadata, and version diff summary (computed by the backend) to identify contextual privacy risks and potential DPDP Act / IT Act compliance gaps.
+
+#### Required Input Fields
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"contextual_privacy_findings"`
+- `dataset_metadata` (`object`):
+  - `dataset_id` (`string`)
+  - `dataset_name` (`string`)
+  - `business_purpose` (`string`): Stated purpose (e.g., `"loyalty_program_marketing"`, `"payroll_processing"`)
+  - `stated_retention_days` (`integer` or `null`): `null` if no retention policy is configured
+  - `has_consent_notice_linked` (`boolean`)
+  - `access_scope` (`string`): Allowed: `"PUBLIC_LINK"`, `"ALL_STAFF"`, `"ROLE_RESTRICTED"`, `"ENCRYPTED_RESTRICTED"`, `"UNKNOWN"`
+  - `third_party_sharing` (`boolean`)
+- `classified_columns` (`array<object>`, min 1 item):
+  - `column_name` (`string`)
+  - `data_category` (`string`): From Task 1 allowed values
+  - `specific_identifier_type` (`string`): From Task 1 allowed values
+  - `sensitivity_tier` (`string`): From Task 1 allowed values
+- `version_diff_summary` (`object` or `null`): Provided by backend when comparing against a prior dataset version:
+  - `added_columns` (`array<string>`)
+  - `removed_columns` (`array<string>`)
+  - `tier_escalations` (`array<string>`): Columns whose sensitivity tier increased
+
+#### Output Fields & Allowed Values
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"contextual_privacy_findings"`
+- `status` (`string`): `"ok"` | `"error"`
+- `overall_risk_level` (`string`): Allowed: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`
+- `confidence` (`number`): Float in `[0.0, 1.0]`
+- `needs_human_review` (`boolean`)
+- `review_reasons` (`array<string>`)
+- `findings` (`array<object>`):
+  - `finding_type` (`string`): Allowed values:
+    - `"OVER_COLLECTION"` (Collecting identifiers unnecessary for `business_purpose`, e.g. Aadhaar for a retail loyalty program)
+    - `"MISSING_CONSENT_BASIS"` (Processing personal data without linked consent notice)
+    - `"EXCESSIVE_ACCESS"` (`CRITICAL_PERSONAL` or `SENSITIVE_PERSONAL` accessible by `ALL_STAFF` or `PUBLIC_LINK`)
+    - `"MISSING_RETENTION_POLICY"` (Personal data stored with `stated_retention_days: null` or excessive duration)
+    - `"UNSAFE_COMBINATION"` (High-risk identity + financial/health/auth fields stored together in plain export)
+    - `"CHILDREN_DATA_SAFEGUARD_REQUIRED"` (Presence of minor's data requiring verifiable parental consent under DPDP Section 9)
+    - `"THIRD_PARTY_SHARING_RISK"` (Sharing critical/sensitive personal data with third parties without safeguards)
+    - `"VERSION_DRIFT_ESCALATION"` (New sensitive/critical columns introduced compared to previous version)
+  - `severity` (`string`): Allowed: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`
+  - `dpdp_reference` (`string`): Relevant DPDP Act 2023 concept (e.g., `"Section 6 (Consent & Purpose Limitation)"`, `"Section 8(5) (Reasonable Security Safeguards)"`, `"Section 8(7) (Storage Limitation / Erasure)"`, `"Section 9 (Children's Personal Data)"`)
+  - `affected_columns` (`array<string>`)
+  - `explanation` (`string`): Plain-language explanation of the risk for a small-business owner
+  - `recommended_remediation` (`string`): Advisory remediation step (human-actionable; never auto-executed)
+
+#### When `needs_human_review` MUST be `true`
+1. `overall_risk_level` is `"HIGH"` or `"CRITICAL"`.
+2. Any finding has `severity: "CRITICAL"`.
+3. `finding_type` includes `"CHILDREN_DATA_SAFEGUARD_REQUIRED"`, `"OVER_COLLECTION"` of `"GOVERNMENT_ID"`, or `"EXCESSIVE_ACCESS"` with `"PUBLIC_LINK"`.
+4. `version_diff_summary` shows newly added `"CRITICAL_PERSONAL"` columns (`"VERSION_DRIFT_ESCALATION"`).
+5. `confidence < 0.75`.
+
+#### Synthetic Example (`contextual_privacy_findings`)
+
+**Request:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_find_9002",
+  "task": "contextual_privacy_findings",
+  "dataset_metadata": {
+    "dataset_id": "ds_510",
+    "dataset_name": "festive_coupon_signups.csv",
+    "business_purpose": "promotional_discount_newsletter",
+    "stated_retention_days": null,
+    "has_consent_notice_linked": false,
+    "access_scope": "ALL_STAFF",
+    "third_party_sharing": true
+  },
+  "classified_columns": [
+    {
+      "column_name": "customer_name",
+      "data_category": "IDENTITY_DEMOGRAPHIC",
+      "specific_identifier_type": "PERSON_NAME",
+      "sensitivity_tier": "GENERAL_PERSONAL"
+    },
+    {
+      "column_name": "mobile_no",
+      "data_category": "CONTACT_INFO",
+      "specific_identifier_type": "PHONE_NUMBER",
+      "sensitivity_tier": "GENERAL_PERSONAL"
+    },
+    {
+      "column_name": "aadhaar_number",
+      "data_category": "GOVERNMENT_ID",
+      "specific_identifier_type": "AADHAAR",
+      "sensitivity_tier": "CRITICAL_PERSONAL"
+    }
+  ],
+  "version_diff_summary": {
+    "added_columns": ["aadhaar_number"],
+    "removed_columns": [],
+    "tier_escalations": []
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_find_9002",
+  "task": "contextual_privacy_findings",
+  "status": "ok",
+  "overall_risk_level": "CRITICAL",
+  "confidence": 0.94,
+  "needs_human_review": true,
+  "review_reasons": [
+    "Overall risk level is CRITICAL.",
+    "Aadhaar government ID collected for a promotional newsletter (OVER_COLLECTION) and newly added in latest dataset version."
+  ],
+  "findings": [
+    {
+      "finding_type": "OVER_COLLECTION",
+      "severity": "CRITICAL",
+      "dpdp_reference": "Section 6 (Consent & Purpose Limitation)",
+      "affected_columns": ["aadhaar_number"],
+      "explanation": "Collecting Aadhaar numbers for a promotional discount newsletter exceeds what is necessary for the stated marketing purpose.",
+      "recommended_remediation": "Remove the 'aadhaar_number' column from the signup form and dataset unless legally mandated."
+    },
+    {
+      "finding_type": "EXCESSIVE_ACCESS",
+      "severity": "HIGH",
+      "dpdp_reference": "Section 8(5) (Reasonable Security Safeguards)",
+      "affected_columns": ["aadhaar_number", "mobile_no"],
+      "explanation": "A dataset containing critical government IDs is accessible to all staff members and shared with third parties.",
+      "recommended_remediation": "Restrict dataset access to authorised compliance roles only and halt third-party sharing until critical identifiers are removed."
+    },
+    {
+      "finding_type": "MISSING_CONSENT_BASIS",
+      "severity": "HIGH",
+      "dpdp_reference": "Section 5 & Section 6 (Notice and Consent)",
+      "affected_columns": ["customer_name", "mobile_no", "aadhaar_number"],
+      "explanation": "No privacy notice or consent record is linked to this promotional signup dataset.",
+      "recommended_remediation": "Attach a clear DPDP-compliant consent notice before collecting customer contact details."
+    }
+  ]
+}
+```
 
 ---
 
-## Changelog
+### Task 3: `classify_privacy_request`
 
-| Version | Date | Author | Summary |
-|---|---|---|---|
-| 0.1.0 | 2026-10-24 | AI/SLM lead | Initial draft — four tasks, common envelope, hard constraints |
+Classifies an incoming Data Principal rights request (under DPDP Act Sections 11–14) from an email, webform, or support ticket, extracts structured handling metadata, and drafts a safe acknowledgement/response template for staff review.
+
+#### Required Input Fields
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"classify_privacy_request"`
+- `case_id` (`string`): Backend privacy request case ID
+- `channel` (`string`): Allowed: `"EMAIL"`, `"WEBFORM"`, `"WHATSAPP_SUPPORT"`, `"IN_PERSON"`, `"GRIEVANCE_PORTAL"`, `"OTHER"`
+- `received_at` (`string`): ISO-8601 timestamp (e.g., `"2026-10-24T10:15:00+05:30"`)
+- `requester_role_hint` (`string`): Allowed: `"CUSTOMER"`, `"EMPLOYEE"`, `"PARENT_GUARDIAN"`, `"NOMINEE"`, `"UNKNOWN"`
+- `identity_verified_by_backend` (`boolean`): Whether the backend has already verified requester identity
+- `request_text` (`string`): Sanitized/redacted text of the request submitted by the data principal
+
+#### Output Fields & Allowed Values
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"classify_privacy_request"`
+- `status` (`string`): `"ok"` | `"error"`
+- `case_id` (`string`)
+- `primary_request_type` (`string`): Allowed values:
+  - `"ACCESS_SUMMARY"` (DPDP Sec 11: Summary of personal data being processed and processing activities)
+  - `"THIRD_PARTY_SHARING_LIST"` (DPDP Sec 11: Identities of other Data Fiduciaries/Processors with whom data was shared)
+  - `"CORRECTION_COMPLETION_UPDATING"` (DPDP Sec 12(1): Correct inaccurate/misleading data, complete or update data)
+  - `"ERASURE"` (DPDP Sec 12(3): Erase personal data no longer necessary or where consent is withdrawn)
+  - `"CONSENT_WITHDRAWAL"` (DPDP Sec 6(4): Withdraw previously given consent)
+  - `"GRIEVANCE_REDRESSAL"` (DPDP Sec 13: Complaint regarding privacy handling or unfulfilled rights)
+  - `"NOMINATION"` (DPDP Sec 14: Nominate an individual in the event of death or incapacity)
+  - `"MULTI_INTENT"` (Request explicitly combines two or more distinct statutory rights)
+  - `"NON_PRIVACY_SUPPORT"` (General billing/order inquiry unrelated to personal data rights)
+  - `"AMBIGUOUS"`
+- `detected_sub_types` (`array<string>`): All individual right types detected in the message (subset of the specific rights above)
+- `urgency` (`string`): Allowed: `"LOW"`, `"NORMAL"`, `"HIGH"`, `"CRITICAL"`
+- `verification_status_advice` (`string`): Allowed:
+  - `"VERIFIED_READY"` (Backend already verified identity)
+  - `"REQUIRES_STANDARD_VERIFICATION"` (Verify registered email/phone OTP before disclosing or erasing data)
+  - `"REQUIRES_GUARDIAN_OR_NOMINEE_PROOF"` (Requester claims to be a parent/guardian or legal nominee)
+- `target_data_categories_mentioned` (`array<string>`): Subset of Task 1 `data_category` values mentioned by the requester
+- `legal_retention_check_required` (`boolean`): `true` if the request involves erasure/withdrawal where statutory tax/medical/financial retention rules may prohibit immediate deletion
+- `explanation` (`string`): Plain-language summary of what the requester is asking for and what staff should check
+- `draft_response_for_staff_review` (`string`): Polite draft reply for human review (never sent automatically by AI)
+- `confidence` (`number`): Float in `[0.0, 1.0]`
+- `needs_human_review` (`boolean`)
+- `review_reasons` (`array<string>`)
+
+#### When `needs_human_review` MUST be `true`
+1. **All actionable privacy rights requests** (`"ERASURE"`, `"ACCESS_SUMMARY"`, `"THIRD_PARTY_SHARING_LIST"`, `"CORRECTION_COMPLETION_UPDATING"`, `"CONSENT_WITHDRAWAL"`, `"GRIEVANCE_REDRESSAL"`, `"NOMINATION"`, `"MULTI_INTENT"`) **must** set `needs_human_review: true` because the AI module must never autonomously delete, alter, or disclose personal data or send external emails.
+2. `identity_verified_by_backend` is `false`.
+3. `requester_role_hint` is `"PARENT_GUARDIAN"` or `"NOMINEE"`.
+4. `primary_request_type` is `"AMBIGUOUS"` or `confidence < 0.80`.
+
+#### Synthetic Example (`classify_privacy_request`)
+
+**Request:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_dsr_9003",
+  "task": "classify_privacy_request",
+  "case_id": "case_2026_0041",
+  "channel": "EMAIL",
+  "received_at": "2026-10-24T14:20:00+05:30",
+  "requester_role_hint": "CUSTOMER",
+  "identity_verified_by_backend": false,
+  "request_text": "Hello, I closed my membership with your store last month. Under the DPDP Act, please tell me which third-party delivery or marketing companies you shared my phone number and address with, and delete all my personal records from your system immediately."
+}
+```
+
+**Response:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_dsr_9003",
+  "task": "classify_privacy_request",
+  "status": "ok",
+  "case_id": "case_2026_0041",
+  "primary_request_type": "MULTI_INTENT",
+  "detected_sub_types": [
+    "THIRD_PARTY_SHARING_LIST",
+    "ERASURE"
+  ],
+  "urgency": "HIGH",
+  "verification_status_advice": "REQUIRES_STANDARD_VERIFICATION",
+  "target_data_categories_mentioned": [
+    "CONTACT_INFO"
+  ],
+  "legal_retention_check_required": true,
+  "explanation": "The customer is exercising two DPDP rights: (1) requesting a list of third parties with whom their contact info was shared (Section 11), and (2) requesting erasure of their personal data (Section 12). Identity verification and tax/invoice retention checks are required before erasure.",
+  "draft_response_for_staff_review": "Dear Customer, thank you for contacting our Privacy Desk (Case #case_2026_0041). To protect your account security, please complete the OTP verification sent to your registered contact. Once verified, we will share the list of data processors/fiduciaries with whom your data was shared and process your erasure request subject to statutory billing retention requirements.",
+  "confidence": 0.95,
+  "needs_human_review": true,
+  "review_reasons": [
+    "Actionable data principal request (ERASURE and THIRD_PARTY_SHARING_LIST) requires human approval before execution.",
+    "Requester identity has not yet been verified (identity_verified_by_backend is false).",
+    "Legal retention check is required before deleting past customer records."
+  ]
+}
+```
 
 ---
 
-## Open questions
+### Task 4: `extract_breach_details`
 
-- [ ] Should `classify_columns` accept batches larger than 200 columns?  If so, define a chunking protocol.
-- [ ] Do we need a `detect_language` pre-flight task so both sides can agree on the language before calling the main tasks?
-- [ ] What is the agreed SLA (milliseconds) for each task so the backend can set appropriate timeouts?
-- [ ] Confirm which Ollama model tag will be the default; document fallback behaviour if the model is not pulled.
-- [ ] Agree on the authentication mechanism between the backend service and the AI module's local HTTP server (e.g. shared secret header, mutual TLS, or no auth since both run on localhost).
+Extracts structured incident details, affected data categories, severity assessment, and draft notification points from an internal incident report or staff description to support DPDP Act Section 8(6) (Data Protection Board of India & affected Data Principal notifications) and CERT-In reporting workflows.
+
+#### Required Input Fields
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"extract_breach_details"`
+- `incident_id` (`string`): Backend incident record ID
+- `reported_at` (`string`): ISO-8601 timestamp when staff logged the report
+- `reporter_role` (`string`): Role of the staff member (e.g., `"IT_ADMIN"`, `"STORE_MANAGER"`, `"SUPPORT_LEAD"`)
+- `incident_narrative` (`string`): Free-text description of what happened (with any raw personal identifiers pre-redacted)
+
+#### Output Fields & Allowed Values
+- `schema_version` (`string`): `"1.0"`
+- `request_id` (`string`)
+- `task` (`string`): `"extract_breach_details"`
+- `status` (`string`): `"ok"` | `"error"`
+- `incident_id` (`string`)
+- `extracted_details` (`object`):
+  - `breach_type` (`string`): Allowed values:
+    - `"UNAUTHORIZED_ACCESS"` (Unauthorised login, credential stuffing, insider misuse)
+    - `"ACCIDENTAL_DISCLOSURE"` (Misdirected email, public cloud bucket/spreadsheet link, wrong recipient)
+    - `"RANSOMWARE_MALWARE"` (Encryption or exfiltration via malware)
+    - `"LOST_OR_STOLEN_DEVICE"` (Unencrypted laptop, USB drive, or phone lost/stolen)
+    - `"VENDOR_THIRD_PARTY_BREACH"` (Compromise at an external processor/vendor)
+    - `"PHYSICAL_BREACH"` (Loss or theft of physical paper files/registers)
+    - `"UNKNOWN"`
+  - `estimated_occurrence_time` (`string` or `null`): ISO-8601 timestamp or extracted time phrase (e.g., `"2026-10-24T08:30:00+05:30"` or `"unknown"`)
+  - `discovery_time` (`string` or `null`): ISO-8601 timestamp or extracted time phrase
+  - `affected_systems` (`array<string>`): Names of systems, files, or services mentioned
+  - `affected_data_categories` (`array<string>`): Subset of Task 1 `data_category` values
+  - `affected_data_principals_estimate` (`integer` or `null`): Estimated count of affected individuals (`null` if unknown)
+  - `is_ongoing` (`boolean` or `null`): `true` if breach is still active, `false` if contained, `null` if unclear
+  - `containment_actions_taken` (`array<string>`): Actions already taken according to the narrative
+  - `missing_critical_facts` (`array<string>`): Key facts still unknown that staff must investigate (e.g., `"Exact number of affected customers"`, `"Whether the exported file was password-protected"`)
+- `assessment` (`object`):
+  - `severity` (`string`): Allowed: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`
+  - `dpb_notification_likely_required` (`boolean`): Under DPDP Act Section 8(6), personal data breaches require intimation to the Data Protection Board (DPB) and affected Data Principals
+  - `cert_in_notification_likely_required` (`boolean`): Whether the incident likely falls under CERT-In mandatory cyber incident categories
+  - `explanation` (`string`): Plain-language reasoning for severity and notification flags
+  - `recommended_next_steps` (`array<string>`): Immediate containment and compliance steps for human staff
+- `draft_notifications` (`object`):
+  - `authority_summary_draft` (`string`): Structured factual draft for regulatory reporting (DPB / CERT-In) with placeholders for missing facts
+  - `data_principal_notice_draft` (`string`): Plain-language draft notice for affected individuals explaining the nature of the breach, likely consequences, mitigation steps, and grievance contact
+- `confidence` (`number`): Float in `[0.0, 1.0]`
+- `needs_human_review` (`boolean`)
+- `review_reasons` (`array<string>`)
+
+#### When `needs_human_review` MUST be `true`
+1. **Always `true` for all breach extraction outputs.** Breach assessment, containment verification, and regulatory notifications to the Data Protection Board of India, CERT-In, or affected Data Principals carry statutory legal consequences and must never be finalized or transmitted without human/legal review.
+2. Additionally, specific reasons must be appended to `review_reasons` whenever `missing_critical_facts` is non-empty, `is_ongoing` is `true` or `null`, or `confidence < 0.80`.
+
+#### Synthetic Example (`extract_breach_details`)
+
+**Request:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_inc_9004",
+  "task": "extract_breach_details",
+  "incident_id": "inc_2026_0009",
+  "reported_at": "2026-10-24T18:00:00+05:30",
+  "reporter_role": "STORE_MANAGER",
+  "incident_narrative": "At around 11:30 AM today (24 Oct), our billing operator accidentally emailed the October monthly GST & customer KYC spreadsheet (oct_kyc_billing.xlsx) to an external vendor distribution list instead of our internal accountant. The file had roughly 450 customer rows containing full names, phone numbers, and PAN numbers. The file was not password protected. We asked the vendor list recipients to delete the email at 2:00 PM, but we do not know if anyone downloaded or forwarded it."
+}
+```
+
+**Response:**
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "req_inc_9004",
+  "task": "extract_breach_details",
+  "status": "ok",
+  "incident_id": "inc_2026_0009",
+  "extracted_details": {
+    "breach_type": "ACCIDENTAL_DISCLOSURE",
+    "estimated_occurrence_time": "2026-10-24T11:30:00+05:30",
+    "discovery_time": "2026-10-24T14:00:00+05:30",
+    "affected_systems": [
+      "Email client",
+      "oct_kyc_billing.xlsx"
+    ],
+    "affected_data_categories": [
+      "IDENTITY_DEMOGRAPHIC",
+      "CONTACT_INFO",
+      "GOVERNMENT_ID"
+    ],
+    "affected_data_principals_estimate": 450,
+    "is_ongoing": null,
+    "containment_actions_taken": [
+      "Sent recall/deletion request to external vendor distribution list recipients at 14:00 IST"
+    ],
+    "missing_critical_facts": [
+      "Number and identities of external recipients on the vendor distribution list",
+      "Written confirmation of deletion from all external recipients"
+    ]
+  },
+  "assessment": {
+    "severity": "HIGH",
+    "dpb_notification_likely_required": true,
+    "cert_in_notification_likely_required": false,
+    "explanation": "Unencrypted disclosure of ~450 customers' names, phone numbers, and PAN numbers to unauthorised external recipients constitutes a reportable personal data breach under DPDP Act Section 8(6).",
+    "recommended_next_steps": [
+      "Obtain the exact recipient list of the external vendor distribution group.",
+      "Collect written confirmation of permanent deletion from each external recipient.",
+      "Review and submit the Data Protection Board intimation and affected customer notices via authorised management."
+    ]
+  },
+  "draft_notifications": {
+    "authority_summary_draft": "INCIDENT SUMMARY (DRAFT FOR REVIEW - Case #inc_2026_0009): On 2026-10-24 at approx. 11:30 IST, an unencrypted spreadsheet ('oct_kyc_billing.xlsx') containing names, phone numbers, and PAN numbers of approximately 450 customers was inadvertently emailed to an external vendor distribution list. Recall and deletion requests were issued at 14:00 IST. [INSERT RECIPIENT COUNT AND DELETION CONFIRMATION STATUS].",
+    "data_principal_notice_draft": "Dear Customer, we are writing to inform you of an inadvertent data disclosure on 24 October 2026 involving a billing file that included your name, phone number, and PAN number. We immediately contacted the external recipients to require deletion of the file. As a precaution, please remain alert to unsolicited calls or messages requesting financial details. For questions or assistance, please contact our Grievance Officer at [INSERT CONTACT DETAILS]."
+  },
+  "confidence": 0.93,
+  "needs_human_review": true,
+  "review_reasons": [
+    "All breach incident assessments and regulatory notification drafts require mandatory human and legal review.",
+    "Critical facts are still missing (recipient count and deletion confirmation)."
+  ]
+}
+```
