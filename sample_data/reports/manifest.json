@@ -1,0 +1,192 @@
+{
+  "generated_at": "2026-10-25T00:00:00",
+  "seed": 42,
+  "regeneration_command": "python sample_data/generate_datasets.py",
+  "original_checksums": {
+    "patients.xlsx": "23f0f79e0b5da069ceaeed1eaf8c9f2c",
+    "staff.csv": "35c25f591269fdf17e346e1ba143fd73",
+    "billing.csv": "cf7f91c111f4fe87be570cb868230302",
+    "appointments_form.csv": "70e7b26fc7bbabd7400d35864f314938",
+    "whatsapp_chat.txt": "765cddf000bfc9be5b751b50122ee7b1",
+    "synthetic_customers.csv": "9cae1b81b9ee79542fe898560a97dd2c",
+    "synthetic_customers_v2.csv": "81ed2068977ba034d1c637dc519f6619"
+  },
+  "datasets": [
+    {
+      "file": "patients_messy.xlsx",
+      "source": "patients.xlsx",
+      "row_count": 44,
+      "column_count": 7,
+      "messy_header_applied": true,
+      "issues": {
+        "exact_duplicates": 5,
+        "plausible_duplicates": 4,
+        "missing_values": {
+          "Notes": 29,
+          "Email": 1
+        },
+        "messy_phones": 5,
+        "messy_emails": 4,
+        "messy_aadhaar": 3,
+        "ambiguous_dates": 4,
+        "category_inconsistencies": 6,
+        "sensitive_notes": 5
+      },
+      "columns_with_personal_data": [
+        "Name",
+        "Phone",
+        "Email",
+        "Aadhaar",
+        "DOB",
+        "Notes"
+      ],
+      "sensitive_columns": [
+        "Aadhaar",
+        "Notes (health)",
+        "Test Name (health)"
+      ],
+      "edge_cases_for_slm": [
+        "Notes column contains health condition mentions requiring DPDP sensitive-data classification",
+        "Aadhaar column contains synthetic invalid tokens and missing values",
+        "Test Name includes HIV, pregnancy \u2014 sensitive health context"
+      ]
+    },
+    {
+      "file": "staff_messy.csv",
+      "source": "staff.csv",
+      "row_count": 33,
+      "column_count": 6,
+      "messy_header_applied": true,
+      "issues": {
+        "exact_duplicates": 5,
+        "plausible_duplicates": 3,
+        "messy_phones": 4,
+        "synthetic_pan_tokens": 3,
+        "messy_salary": 3,
+        "missing_values": {
+          "pan": 2,
+          "phone": 2
+        },
+        "leading_zero_accounts": 18,
+        "extra_whitespace_name": 3
+      },
+      "columns_with_personal_data": [
+        "name",
+        "pan",
+        "phone",
+        "bank_account"
+      ],
+      "sensitive_columns": [
+        "pan (GOVERNMENT_ID)",
+        "bank_account (FINANCIAL)",
+        "salary (FINANCIAL)",
+        "ifsc (FINANCIAL)"
+      ],
+      "edge_cases_for_slm": [
+        "PAN column contains clearly synthetic tokens mixed with pattern-valid values",
+        "Bank account numbers have leading zeros \u2014 must be preserved as TEXT",
+        "Salary field has non-numeric entries requiring validation"
+      ]
+    },
+    {
+      "file": "billing_messy.csv",
+      "source": "billing.csv",
+      "row_count": 44,
+      "column_count": 5,
+      "messy_header_applied": true,
+      "issues": {
+        "exact_duplicates": 4,
+        "messy_phones": 5,
+        "messy_amounts": 4,
+        "invalid_invoice_refs": 3,
+        "missing_gstin": 5,
+        "extra_whitespace_name": 3
+      },
+      "cross_file_relationship": "patient_name should match patients.xlsx Name column \u2014 invalid refs are labelled edge cases",
+      "columns_with_personal_data": [
+        "patient_name",
+        "phone"
+      ],
+      "sensitive_columns": [
+        "phone (CONTACT)"
+      ],
+      "edge_cases_for_slm": [
+        "Some rows reference patients not present in patients.xlsx (deliberate invalid FK)",
+        "GSTIN field: empty cells vs. a shared GSTIN \u2014 business-purpose ambiguity for review"
+      ]
+    },
+    {
+      "file": "appointments_messy.csv",
+      "source": "appointments_form.csv",
+      "row_count": 64,
+      "column_count": 5,
+      "messy_header_applied": true,
+      "issues": {
+        "exact_duplicates": 6,
+        "plausible_duplicates": 3,
+        "messy_phones": 7,
+        "messy_emails": 5,
+        "ambiguous_timestamps": 5,
+        "missing_emails": 4,
+        "reason_category_inconsistencies": 8,
+        "unknown_reason_needs_review": 3,
+        "extra_whitespace_name": 4
+      },
+      "columns_with_personal_data": [
+        "Name",
+        "Phone",
+        "Email"
+      ],
+      "sensitive_columns": [
+        "Reason (health condition)",
+        "Email (CONTACT)",
+        "Phone (CONTACT)"
+      ],
+      "edge_cases_for_slm": [
+        "Reason field contains HIV screening, pregnancy \u2014 sensitive health context",
+        "3 rows have 'Other / Not specified' reason \u2014 unknown business purpose requiring owner review",
+        "Ambiguous timestamps like '01/02/26' cannot be safely parsed without locale context"
+      ]
+    },
+    {
+      "file_v1": "customers_messy_v1.csv",
+      "file_v2": "customers_messy_v2.csv",
+      "source_v1": "synthetic_customers.csv",
+      "source_v2": "synthetic_customers_v2.csv",
+      "row_count_v1": 38,
+      "row_count_v2": 15,
+      "column_count": 8,
+      "version_diff_expected": {
+        "unchanged": 5,
+        "changed": 3,
+        "added": 7,
+        "removed": 2
+      },
+      "issues_v1": {
+        "exact_duplicates": 3,
+        "messy_phones": 4,
+        "messy_emails": 3,
+        "synthetic_pan_tokens": 3,
+        "city_inconsistencies": 4,
+        "messy_amounts": 2,
+        "extra_whitespace_name": 2
+      },
+      "columns_with_personal_data": [
+        "customer_name",
+        "email",
+        "phone",
+        "pan_number"
+      ],
+      "sensitive_columns": [
+        "pan_number (GOVERNMENT_ID)",
+        "phone (CONTACT)",
+        "email (CONTACT)"
+      ],
+      "edge_cases_for_slm": [
+        "PAN column contains clearly synthetic tokens for identifier detector edge-case testing",
+        "City column has regional spelling variants (Mumbai/Bombay, Bengaluru/Bangalore)",
+        "V2 excludes 2 customers from V1 \u2014 tests REMOVED detection in version reconciler"
+      ]
+    }
+  ]
+}

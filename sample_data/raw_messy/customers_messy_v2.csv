@@ -1,0 +1,16 @@
+CustomerID,Customer Name,EMAIL,Phone,PAN Number,city,pin_code,Amount
+CUST001,Aarav Sharma,aarav.sharma@example.com,9876543210,ABCDE1234F,Mumbai,400001,1499.50
+CUST002,Priya Patel,priya.patel@example.com,0000000000,BCDEF2345G,Ahmedabad,380001,2999.00
+CUST003,Rohan Verma,rohan.verma@example.com,9988776655,CDEFG3456H,New Delhi,110001,750.25
+CUST004,Ananya Iyer,missing_at_sign.example.com,9845012345,DEFGH4567I,Bengaluru,560001,4500.00
+CUST005,Vikram Singh,vikram.singh@example.com,9711223344,EFGHI5678J,Jaipur,302001,1320.00
+CUST006,Neha Mukherjee,neha.mukherjee@example.com,9654321098,FGHIJ6789K,Kolkata,700001,3410.83
+CUST007,Aditya Nair,aditya.nair@example.com,9447123456,GHIJK7890L,Kochi,682001,979.00
+CUST008,Kavita Rao,kavita.rao@example.com,9823012345,HIJKL8901M,Pune,411001,5200.50
+CUST051,New Customer 01,newcust051@example.com,9991713190,EXYZH6549U,Jaipur,141001,9635.39
+CUST052,New Customer 02,newcust052@example.com,9909763993,ZWSZZ6992C,Delhi,462001,336.39
+CUST053,New Customer 03,newcust053@example.com,9232702394,LRRPV7086C,Lucknow,411001,4820.00
+CUST054,New Customer 04,newcust054@example.com,9702806585,IPQQM5951Q,Hyderabad,560001,1569.67
+CUST055,New Customer 05,newcust055@example.com,9426808977,ZDGNK7078R,Mumbai,800001,4307.02
+CUST056,New Customer 06,newcust056@example.com,9545478870,RVQYH7070F,Delhi,141001,9514.49
+CUST057,New Customer 07,newcust057@example.com,9206681214,ZJXQB5520E,Kolkata,560001,9499.36

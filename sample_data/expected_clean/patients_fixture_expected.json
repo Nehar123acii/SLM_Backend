@@ -1,0 +1,77 @@
+[
+  {
+    "row": 0,
+    "name_cleaned": "Ravi Kumar",
+    "phone_cleaned": "9876543210",
+    "applied": [
+      "strip_whitespace_name"
+    ],
+    "remaining": []
+  },
+  {
+    "row": 1,
+    "applied": [],
+    "remaining": []
+  },
+  {
+    "row": 2,
+    "name_cleaned": "Arjun Das",
+    "phone_cleaned": "9988776655",
+    "applied": [
+      "strip_whitespace_name",
+      "strip_whitespace_phone"
+    ],
+    "remaining": []
+  },
+  {
+    "row": 3,
+    "applied": [],
+    "remaining": [
+      "INVALID_EMAIL: 'not-an-email' does not match email pattern; requires human review"
+    ]
+  },
+  {
+    "row": 4,
+    "applied": [],
+    "remaining": [
+      "MISSING_PHONE: cannot infer phone number; requires human review"
+    ]
+  },
+  {
+    "row": 5,
+    "applied": [],
+    "remaining": [
+      "AMBIGUOUS_DATE: '01/02/03' is ambiguous (day/month/year order unclear); not parsed"
+    ]
+  },
+  {
+    "row": 6,
+    "applied": [],
+    "remaining": [
+      "INVALID_AADHAAR_PATTERN: 'TEST-AADHAAR-1' does not match 12-digit pattern; flagged for review"
+    ]
+  },
+  {
+    "row": 7,
+    "applied": [
+      "normalise_test_name: 'cbc' \u2192 'CBC'"
+    ],
+    "remaining": [
+      "REVIEW_RECOMMENDED: canonical mapping applied; verify with owner"
+    ]
+  },
+  {
+    "row": 8,
+    "applied": [],
+    "remaining": [
+      "SENSITIVE_NOTES: Note mentions health condition; requires SLM contextual review before classification"
+    ]
+  },
+  {
+    "row": 9,
+    "applied": [],
+    "remaining": [
+      "EXACT_DUPLICATE: duplicate of row 0; flagged for owner decision \u2014 not auto-deleted"
+    ]
+  }
+]

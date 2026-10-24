@@ -1,0 +1,61 @@
+from contextlib import asynccontextmanager
+import logging
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.config import settings
+from backend.db.engine import engine
+from backend.db.models import Base
+from backend.api import inventory_router, privacy_requests_router, incidents_router
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: ensure upload temp directory and database tables exist
+    os.makedirs(settings.upload_temp_dir, exist_ok=True)
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables initialized. Upload directory verified at %s.", settings.upload_temp_dir)
+    yield
+    # Shutdown logic if needed
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Local-First Privacy Compliance Assistant",
+        description="Backend API supporting DPDP compliance, data inventory, rights requests, and incident tracking.",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    # Basic CORS setup for local frontend development
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Register API Routers
+    app.include_router(inventory_router)
+    app.include_router(privacy_requests_router)
+    app.include_router(incidents_router)
+
+    @app.get("/health", tags=["health"])
+    def health_check():
+        return {
+            "status": "healthy",
+            "ai_mode": settings.ai_mode,
+        }
+
+    return app
+
+
+app = create_app()

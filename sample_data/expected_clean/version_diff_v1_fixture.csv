@@ -1,0 +1,6 @@
+customer_id,customer_name,email,phone,pan_number,city,pincode,purchase_amount_inr
+CUST001,Alpha Ltd,alpha@example.com,9876543210,ABCDE1234F,Mumbai,400001,1500.00
+CUST002,Beta Corp,beta@example.com,9123456780,BCDEF2345G,Delhi,110001,2000.00
+CUST003,Gamma Inc,gamma@example.com,9988776655,CDEFG3456H,Pune,411001,750.00
+CUST004,Delta Stores,delta@example.com,9845012345,DEFGH4567I,Kolkata,700001,4500.00
+CUST005,Epsilon Ltd,epsilon@example.com,9711223344,EFGHI5678J,Chennai,600001,1200.00

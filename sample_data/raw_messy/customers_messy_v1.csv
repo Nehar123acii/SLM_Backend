@@ -1,0 +1,39 @@
+CustomerID,Customer Name,EMAIL,Phone,PAN Number,city,pin_code,Amount
+CUST001,Aarav Sharma,aarav.sharma@example.com,9876543210,ABCDE1234F,Mumbai,400001,1499.50
+CUST002,Priya Patel,priya.patel@example.com,0000000000,BCDEF2345G,Ahmedabad,380001,2999.00
+CUST003,Rohan Verma,rohan.verma@example.com,9988776655,CDEFG3456H,New Delhi,110001,750.25
+CUST004,Ananya Iyer,missing_at_sign.example.com,9845012345,DEFGH4567I,Bengaluru,560001,4500.00
+CUST005,Vikram Singh,vikram.singh@example.com,9711223344,EFGHI5678J,Jaipur,302001,1200.00
+CUST006,Neha Mukherjee,neha.mukherjee@example.com,9654321098,FGHIJ6789K,Kolkata,700001,3100.75
+CUST007,Aditya Nair,aditya.nair@example.com,9447123456,GHIJK7890L,Kochi,682001,890.00
+CUST008,Kavita Rao,kavita.rao@example.com,9823012345,HIJKL8901M,Pune,411001,5200.50
+CUST009,  Siddharth Gupta  ,siddharth.gupta@example.com,9765432100,IJKLM9012N,Lucknow,226001,1850.00
+CUST010,Deepa Reddy,deepa.reddy@example.com,9848012345,JKLMN0123O,Hyderabad,500001,6400.00
+CUST005,Vikram Singh,vikram.singh@example.com,9711223344,EFGHI5678J,Jaipur,302001,1200.00
+CUST001,Aarav Sharma,aarav.sharma@example.com,9876543210,ABCDE1234F,Mumbai,400001,1499.50
+CUST001,Aarav Sharma,aarav.sharma@example.com,9876543210,AAAAA0000A,Mumbai,400001,1499.50
+CUST013,Customer 013,customer013@example.com,9413679331,SDWMW5658M,Lucknow,141001,3538.58
+CUST014,Customer 014,customer014@example.com,9371096600,TEST00001T,Mumbai,491001,9500.48
+CUST015,Customer 015,customer015@example.com,9366493008,DTPUF9561J,Ahmedabad,141001,3113.76
+CUST016,Customer 016,customer016@example.com,9560452529,HQPTY4404Q,Hyderabad,226001,6671.54
+CUST017,Customer 017,customer017@example.com,9357553274,EBALP5771A,Delhi,500001,7127.46
+CUST018,Customer 018,customer018@example.com,+910000000001,RYUQR4241L,Pune,800001,2402.91
+CUST019,Customer 019,customer019@example.com,9385220694,VBEHT5728L,delhi,141001,6948.36
+CUST020,Customer 020,customer020@example.com,9392322121,NMCBL6280P,Kochi,400001,"₹ 1,500"
+CUST021,Customer 021,customer021@example.com,9730418447,YZRHB3870M,Hyderabad,141001,9176.60
+CUST022,Customer 022,customer022@example.com,123,XXXXX9999X,Delhi,700001,3431.75
+CUST023,Customer 023,customer023@example.com,9409471503,RKTAC5135I,Pune,462001,8675.26
+CUST024,Customer 024,customer024@example.com,9806157458,WMBNQ9167Q,Mumbai,380001,2194.67
+CUST025,Customer 025,customer025@example.com,9240674381,YLSDZ4920S,Lucknow,500001,5597.67
+CUST026,Customer 026,customer026@example.com,9538076670,CZXLD3522M,Lucknow,500001,"₹ 1,500"
+CUST027,Customer 027,customer027@example.com,9546129354,VZGOJ9327T,Jaipur,302001,8666.60
+CUST028,Customer 028,customer028@example.com,9929653607,UKYNV5634S,Jaipur,491001,5882.67
+CUST029,Customer 029,customer029@example.com,9259553112,LMITJ6272W,Pune,411001,5803.05
+CUST030,Customer 030,customer030@example.com,9932734539,KIMXJ3492M,Bengaluru,380001,1437.09
+CUST031,Customer 031,trailing@example.com  ,9456476596,WWLNL3361K,Hyderabad,302001,933.24
+CUST032,Customer 032,customer032@example.com,9463527356,QKCIR9742J,Jaipur,600001,6342.01
+CUST033,Customer 033,customer033@example.com,9680911523,ABQXZ2480L,Pune,560001,7650.86
+CUST034,  Customer 034  ,customer034@example.com,9576396216,EHAIB6873J,Ahmedabad,302001,2592.89
+CUST035,Customer 035,customer035@example.com,9707660630,REEPJ4945M,Kochi,491001,1602.41
+CUST036,Customer 036,double@@example.com,,GGAUX9955E,Pune,141001,9462.36
+CUST037,Customer 037,customer037@example.com,9421214426,QLGVF7302W,hyderabad,560001,2524.38

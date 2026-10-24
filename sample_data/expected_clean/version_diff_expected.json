@@ -1,0 +1,23 @@
+{
+  "key_column": "CUST_ID",
+  "unchanged_count": 2,
+  "changed_count": 1,
+  "added_count": 2,
+  "removed_count": 2,
+  "changed_rows": [
+    {
+      "key": "CUST002",
+      "changed_columns": [
+        "purchase_amount_inr"
+      ]
+    }
+  ],
+  "added_keys": [
+    "CUST006",
+    "CUST007"
+  ],
+  "removed_keys": [
+    "CUST004",
+    "CUST005"
+  ]
+}

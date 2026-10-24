@@ -1,0 +1,41 @@
+[
+  {
+    "row": 0,
+    "applied": [],
+    "remaining": [
+      "LEADING_ZERO_ACCOUNT: preserve '0046281948219' as TEXT"
+    ]
+  },
+  {
+    "row": 1,
+    "name_cleaned": "Priya Sharma",
+    "applied": [
+      "strip_whitespace_name",
+      "normalise_phone: +917786579754 \u2192 7786579754"
+    ],
+    "remaining": []
+  },
+  {
+    "row": 2,
+    "applied": [],
+    "remaining": [
+      "SYNTHETIC_PAN_TOKEN: 'AAAAA0000A' is a clearly synthetic test value; identifier detector should flag but not classify as real PAN"
+    ]
+  },
+  {
+    "row": 3,
+    "applied": [],
+    "remaining": [
+      "MISSING_PAN: cannot infer; requires human review"
+    ]
+  },
+  {
+    "row": 4,
+    "applied": [],
+    "remaining": [
+      "INVALID_PHONE: 'PHONE-MISSING' is not a valid phone number",
+      "INVALID_SALARY: 'NaN' is not numeric; requires human review",
+      "SYNTHETIC_PAN_TOKEN: 'XXXXX9999X' is a test sentinel"
+    ]
+  }
+]
