@@ -13,3 +13,4 @@ anyio>=4.0.0
 pillow>=10.0.0
 pymupdf>=1.24.0
 pytesseract>=0.3.10
+pyyaml>=6.0
