@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.api.deps import get_db
 from backend.db.models import Dataset
 from backend.services.purge import touch_activity
+from backend.services.i18n import t
 from backend.services.purposes import (
     VALID_SEGMENTS,
     generate_questions,
@@ -30,19 +31,35 @@ class SegmentUpdateRequest(BaseModel):
 
 
 @router.get("/purposes")
-def get_purposes_vocabulary():
+def get_purposes_vocabulary(lang: str = "en"):
     """Returns the controlled purpose vocabulary."""
-    return load_purposes_vocabulary()
+    voc = load_purposes_vocabulary()
+    out = []
+    for item in voc:
+        it = dict(item)
+        loc = t(f"purposes.{item['id']}.label", lang=lang)
+        it["label"] = str(loc)
+        it["machine_translated"] = getattr(loc, "machine_translated", False)
+        out.append(it)
+    return out
 
 
 @router.get("/questions")
-def get_open_questions(db: Session = Depends(get_db)):
+def get_open_questions(lang: str = "en", db: Session = Depends(get_db)):
     """
     Returns open questions for columns requiring a confirmed business purpose,
     ordered by impact tier descending then occurrence count descending.
     Includes progress counts (answered, total).
     """
-    return generate_questions(db)
+    res = generate_questions(db)
+    if isinstance(res, dict) and "options" in res:
+        for opt in res["options"]:
+            opt_id = opt.get("id")
+            if opt_id and opt_id != "unknown":
+                loc = t(f"purposes.{opt_id}.label", lang=lang)
+                opt["label"] = str(loc)
+                opt["machine_translated"] = getattr(loc, "machine_translated", False)
+    return res
 
 
 @router.post("/answers", status_code=status.HTTP_201_CREATED)

@@ -39,6 +39,7 @@ from backend.db.models import (
     utc_now,
 )
 from backend.services.ledger import append_event
+from backend.services.i18n import t
 
 MODULE_LABEL = "readiness for obligations from May 2027"
 TIER_3_HIGH_IMPACT = {"aadhaar", "pan", "bank_account", "health", "health_term"}
@@ -492,6 +493,7 @@ def generate_individual_notice(
     scenario_desc: str,
     categories: List[str],
     aware_at_dt: datetime.datetime,
+    lang: str = "en",
 ) -> str:
     """
     Generates draft notice for affected individuals structured with clauses (a) to (e).
@@ -512,10 +514,18 @@ def generate_individual_notice(
     consequences_str = "\n".join(consequences)
 
     date_str = aware_at_dt.strftime("%d %B %Y")
+    
+    header = str(t("notices.notice_header", lang=lang))
+    cl_a = str(t("notices.clause_a_title", lang=lang))
+    cl_b = str(t("notices.clause_b_title", lang=lang))
+    cl_c = str(t("notices.clause_c_title", lang=lang))
+    cl_d = str(t("notices.clause_d_title", lang=lang))
+    cl_e = str(t("notices.clause_e_title", lang=lang))
+    watermark = str(t("notices.draft_watermark", lang=lang))
 
-    return f"""# DRAFT SIMULATION - DPDP Act Readiness (May 2027)
+    return f"""# {watermark}
 
-## Notice of Data Security Incident to Data Principal
+## {header}
 
 **Date:** [DATE_TIME]
 **From:** [BUSINESS_NAME]
@@ -525,26 +535,26 @@ Dear Patron,
 
 We are writing to provide transparent notification of a recent security incident that may have involved information related to you.
 
-### Clause (a) What Happened
+### {cl_a}
 On {date_str}, an incident was identified involving {scenario_title.lower()}: {scenario_desc}. Prompt containment steps were initiated to secure the environment.
 
-### Clause (b) Likely Consequences
+### {cl_b}
 Based on our assessment of the records involved, potential implications include:
 {consequences_str}
 
-### Clause (c) Mitigation Measures
+### {cl_c}
 We have taken the following mitigation steps:
 - Isolated affected repositories and revoked compromised access tokens.
 - Initiated required regulatory reporting to the Data Protection Board of India.
 - Conducted integrity checks across backups and tightened access controls.
 
-### Clause (d) Safety Steps You Can Take
+### {cl_d}
 To safeguard your privacy and account security:
 - Remain vigilant against unexpected calls, SMS, or emails asking for OTPs, passwords, or personal credentials.
 - Remember that [BUSINESS_NAME] will NEVER contact you to ask for payment PINs or banking passwords.
 - Report any suspicious or unsolicited communication referencing our services to our response contact below.
 
-### Clause (e) Business Contact
+### {cl_e}
 If you have any questions or require support, please contact our designated response desk:
 - **Designated Person:** [CONTACT_PERSON]
 - **Phone / Email:** [PHONE_OR_EMAIL]
@@ -702,7 +712,7 @@ def generate_board_detailed_report(
 # Part E: Ordered Checklist
 # ---------------------------------------------------------------------------
 
-def get_ordered_checklist() -> List[Dict[str, Any]]:
+def get_ordered_checklist(lang: str = "en") -> List[Dict[str, Any]]:
     """
     Returns ordered response checklist across the 6 core stages:
     1. Contain
@@ -715,50 +725,27 @@ def get_ordered_checklist() -> List[Dict[str, Any]]:
     'check other-law reporting duties (to verify)'.
     Contains NO claims of automated detection, tracing, or legal determination.
     """
-    return [
-        {
-            "step": 1,
-            "stage": "contain",
-            "title": "Contain the Incident",
-            "task": "Isolate affected machines and disconnect from network. Do not power down unthinkingly (ask your IT adviser). Revoke compromised user credentials, active tokens, and admin sessions.",
-            "completed": False,
-        },
-        {
-            "step": 2,
-            "stage": "preserve_evidence",
-            "title": "Preserve Evidence",
-            "task": "Do not wipe or reformat affected machines. Photograph ransom note or error screen if ransomware. Export and archive system access logs, firewalls, and audit trails. Record exact timestamps of discovery and containment.",
-            "completed": False,
-        },
-        {
-            "step": 3,
-            "stage": "assess",
-            "title": "Assess Blast Radius & Obligations",
-            "task": "Assess blast radius: estimate affected data categories, number of data principals, and minor records involved. Check other-law reporting duties (to verify) (e.g. CERT-In reporting obligations, sectoral guidelines).",
-            "completed": False,
-        },
-        {
-            "step": 4,
-            "stage": "notify",
-            "title": "Statutory & Principal Notifications",
-            "task": "Submit Stage 1 preliminary intimation to the Data Protection Board of India without delay. Intimate affected data principals without delay with clear protective advice. Prepare Stage 2 detailed report within 72 hours (or submit written extension request).",
-            "completed": False,
-        },
-        {
-            "step": 5,
-            "stage": "recover",
-            "title": "Business Recovery",
-            "task": "Address core business recovery questions: 1) How long can the business run without the system? 2) How much data can it lose? Restore systems from clean, isolated offline backups (ask your IT adviser).",
-            "completed": False,
-        },
-        {
-            "step": 6,
-            "stage": "review",
-            "title": "Post-Incident Review",
-            "task": "Conduct thorough post-incident review. Document findings, patch identified vulnerabilities, update access control policies, and provide refresher privacy safeguards training.",
-            "completed": False,
-        },
+    stages = [
+        ("contain", "Contain the Incident", "Isolate affected machines and disconnect from network. Do not power down unthinkingly (ask your IT adviser). Revoke compromised user credentials, active tokens, and admin sessions."),
+        ("preserve_evidence", "Preserve Evidence", "Do not wipe or reformat affected machines. Photograph ransom note or error screen if ransomware. Export and archive system access logs, firewalls, and audit trails. Record exact timestamps of discovery and containment."),
+        ("assess", "Assess Blast Radius & Obligations", "Assess blast radius: estimate affected data categories, number of data principals, and minor records involved. Check other-law reporting duties (to verify) (e.g. CERT-In reporting obligations, sectoral guidelines)."),
+        ("notify", "Statutory & Principal Notifications", "Submit Stage 1 preliminary intimation to the Data Protection Board of India without delay. Intimate affected data principals without delay with clear protective advice. Prepare Stage 2 detailed report within 72 hours (or submit written extension request)."),
+        ("recover", "Business Recovery", "Address core business recovery questions: 1) How long can the business run without the system? 2) How much data can it lose? Restore systems from clean, isolated offline backups (ask your IT adviser)."),
+        ("review", "Post-Incident Review", "Conduct thorough post-incident review. Document findings, patch identified vulnerabilities, update access control policies, and provide refresher privacy safeguards training."),
     ]
+    items = []
+    for step_num, (stg, def_title, def_task) in enumerate(stages, 1):
+        loc_title = t(f"checklist.{stg}.title", lang=lang)
+        loc_task = t(f"checklist.{stg}.task", lang=lang)
+        items.append({
+            "step": step_num,
+            "stage": stg,
+            "title": str(loc_title) if loc_title else def_title,
+            "task": str(loc_task) if loc_task else def_task,
+            "completed": False,
+            "machine_translated": getattr(loc_task, "machine_translated", False),
+        })
+    return items
 
 
 # ---------------------------------------------------------------------------

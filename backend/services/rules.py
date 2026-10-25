@@ -27,6 +27,7 @@ from backend.db.models import (
     QuestionnaireAnswer,
 )
 from backend.services.ledger import append_event
+from backend.services.i18n import t, t_meta
 
 # ---------------------------------------------------------------------------
 # Data Models & Constants
@@ -56,48 +57,64 @@ QUESTIONNAIRE_KEYS = {
 QUESTIONNAIRE_QUESTIONS = [
     {
         "key": "cctv",
+        "title_key": "questions.cctv.title",
+        "question_key": "questions.cctv.question",
         "title": "CCTV surveillance on premises",
         "question": "Do you operate CCTV cameras in patient, customer, or office premises? Requires visible collection notice (s.5).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "personal_phones",
+        "title_key": "questions.personal_phones.title",
+        "question_key": "questions.personal_phones.question",
         "title": "Staff personal mobile devices",
         "question": "Do staff, contractors, or doctors store patient or customer records on personal phones? (s.8(5)).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "vendors",
+        "title_key": "questions.vendors.title",
+        "question_key": "questions.vendors.question",
         "title": "Vendors without written agreements",
         "question": "Do you share personal data with external labs, software providers, or accountants without written DPAs? (s.8(2)).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "breach_contact",
+        "title_key": "questions.breach_contact.title",
+        "question_key": "questions.breach_contact.question",
         "title": "Designated breach point of contact",
         "question": "Have you established a breach notification procedure and published a designated point of contact? (s.8(6)).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "retention_policy",
+        "title_key": "questions.retention_policy.title",
+        "question_key": "questions.retention_policy.question",
         "title": "Documented data retention policy",
         "question": "Do you have a written schedule to periodically delete personal data once purpose has expired? (s.8(7)).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "children_served",
+        "title_key": "questions.children_served.title",
+        "question_key": "questions.children_served.question",
         "title": "Direct processing of minors' data",
         "question": "Do you knowingly serve or retain data of children under 18 requiring verifiable parental consent? (s.9).",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "shared_folder",
+        "title_key": "questions.shared_folder.title",
+        "question_key": "questions.shared_folder.question",
         "title": "Customer files in shared or open folder",
         "question": "Do you keep customer or patient files in a shared or open folder, such as a shared drive or a group chat anyone can open?",
         "options": ["yes", "no", "not_sure"],
     },
     {
         "key": "collection_notice",
+        "title_key": "questions.collection_notice.title",
+        "question_key": "questions.collection_notice.question",
         "title": "Notice at collection touchpoints",
         "question": "Do you tell people why you collect their details, for example a sign at the desk or a line on your registration form?",
         "options": ["yes", "no", "not_sure"],
@@ -108,6 +125,10 @@ QUESTIONNAIRE_QUESTIONS = [
 ADDITIONAL_RULES: List[Dict[str, Any]] = [
     {
         "id": "unknown_purposes",
+        "title_key": "flags.unknown_purposes.title",
+        "whats_right_key": "flags.unknown_purposes.whats_right",
+        "whats_not_key": "flags.unknown_purposes.whats_not",
+        "how_to_fix_key": "flags.unknown_purposes.how_to_fix",
         "title": "Unconfirmed processing purposes for data columns",
         "citation_hint": "s.4 lawful basis & s.6 consent",
         "severity": "high",
@@ -126,6 +147,10 @@ ADDITIONAL_RULES: List[Dict[str, Any]] = [
     },
     {
         "id": "no_named_contact",
+        "title_key": "flags.no_named_contact.title",
+        "whats_right_key": "flags.no_named_contact.whats_right",
+        "whats_not_key": "flags.no_named_contact.whats_not",
+        "how_to_fix_key": "flags.no_named_contact.how_to_fix",
         "title": "No designated breach response point of contact",
         "citation_hint": "s.8(6) breach intimation",
         "severity": "high",
@@ -496,13 +521,20 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
 # Questionnaire Persistence & Retrieval
 # ---------------------------------------------------------------------------
 
-def get_questionnaire_questions(db: Session) -> List[Dict[str, Any]]:
-    """Returns 6 operational questionnaire questions with current saved answers."""
+def get_questionnaire_questions(db: Session, lang: str = "en") -> List[Dict[str, Any]]:
+    """Returns 8 operational questionnaire questions with current saved answers and localization."""
     qa_map = {row.key: row.answer for row in db.query(QuestionnaireAnswer).all()}
     output = []
     for q in QUESTIONNAIRE_QUESTIONS:
         q_copy = dict(q)
+        title_key = q.get("title_key", f"questions.{q['key']}.title")
+        quest_key = q.get("question_key", f"questions.{q['key']}.question")
+        loc_title = t(title_key, lang=lang)
+        loc_quest = t(quest_key, lang=lang)
+        q_copy["title"] = str(loc_title)
+        q_copy["question"] = str(loc_quest)
         q_copy["answer"] = qa_map.get(q["key"], "unanswered")
+        q_copy["machine_translated"] = getattr(loc_quest, "machine_translated", False)
         output.append(q_copy)
     return output
 
@@ -590,8 +622,8 @@ def run_flags(db: Session) -> Dict[str, Any]:
     }
 
 
-def get_latest_flags(db: Session) -> List[Dict[str, Any]]:
-    """Retrieves latest flag results enriched with rules.yaml metadata."""
+def get_latest_flags(db: Session, lang: str = "en") -> List[Dict[str, Any]]:
+    """Retrieves latest flag results enriched with rules.yaml metadata, localized by lang."""
     last_flag = db.query(FlagResult).order_by(FlagResult.id.desc()).first()
     if not last_flag:
         # Run flags snapshot if none exists
@@ -611,19 +643,38 @@ def get_latest_flags(db: Session) -> List[Dict[str, Any]]:
             except (json.JSONDecodeError, TypeError):
                 ev_refs = [f.evidence_refs]
 
+        title_key = r_def.get("title_key", f"flags.{f.rule_id}.title")
+        whats_right_key = r_def.get("whats_right_key", f"flags.{f.rule_id}.whats_right")
+        whats_not_key = r_def.get("whats_not_key", f"flags.{f.rule_id}.whats_not")
+        how_to_fix_key = r_def.get("how_to_fix_key", f"flags.{f.rule_id}.how_to_fix")
+
+        t_title = t(title_key, lang=lang) if title_key else r_def.get("title", f.rule_id)
+        t_right = t(whats_right_key, lang=lang) if whats_right_key else r_def.get("whats_right", "No issue found by Kavach's checks.")
+        t_not = t(whats_not_key, lang=lang) if whats_not_key else r_def.get("whats_not", "")
+        t_fix = t(how_to_fix_key, lang=lang) if how_to_fix_key else r_def.get("how_to_fix", "")
+
+        is_mt = (
+            getattr(t_title, "machine_translated", False)
+            or getattr(t_right, "machine_translated", False)
+            or getattr(t_not, "machine_translated", False)
+            or getattr(t_fix, "machine_translated", False)
+        )
+
         output.append({
             "rule_id": f.rule_id,
             "state": f.state,
-            "title": r_def.get("title", f.rule_id),
+            "title": str(t_title),
             "citation_hint": r_def.get("citation_hint", ""),
             "verify": r_def.get("verify", True),
             "verified": r_def.get("verified", False),
-            "whats_right": r_def.get("whats_right", "No issue found by Kavach's checks."),
-            "whats_not": r_def.get("whats_not", ""),
-            "how_to_fix": r_def.get("how_to_fix", ""),
+            "whats_right": str(t_right),
+            "whats_not": str(t_not),
+            "how_to_fix": str(t_fix),
             "fix_action": r_def.get("fix_action", "review_columns"),
             "evidence_refs": ev_refs,
             "created_at": f.created_at.isoformat() if f.created_at else None,
+            "machine_translated": is_mt,
+            "review_status": "machine-translated, not yet reviewed" if is_mt else "reviewed",
         })
 
     return output

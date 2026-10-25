@@ -36,9 +36,9 @@ class SingleQuestionnaireAnswerRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/questionnaire", response_model=List[Dict[str, Any]])
-def get_questionnaire(db: Session = Depends(get_db)):
-    """Retrieve the 6 operational DPDP readiness questions with current answers."""
-    return get_questionnaire_questions(db)
+def get_questionnaire(lang: str = "en", db: Session = Depends(get_db)):
+    """Retrieve the operational DPDP readiness questions with current answers."""
+    return get_questionnaire_questions(db, lang=lang)
 
 
 @router.post("/api/questionnaire", status_code=status.HTTP_200_OK)
@@ -117,9 +117,9 @@ def evaluate_and_snapshot_flags(db: Session = Depends(get_db)):
 
 
 @router.get("/api/flags", response_model=List[Dict[str, Any]])
-def get_flags(db: Session = Depends(get_db)):
+def get_flags(lang: str = "en", db: Session = Depends(get_db)):
     """
     Retrieve latest compliance flags snapshot with full metadata:
     whats_right, whats_not, how_to_fix, citation chip data, and fix_action.
     """
-    return get_latest_flags(db)
+    return get_latest_flags(db, lang=lang)

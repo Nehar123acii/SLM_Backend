@@ -14,10 +14,12 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.services.breach import (
+    get_ordered_checklist,
     get_scenario_by_id,
     load_scenarios,
     simulate_breach,
 )
+from backend.services.i18n import t
 
 router = APIRouter(prefix="/api/breach", tags=["breach"])
 
@@ -70,3 +72,38 @@ def run_breach_simulation(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Breach simulation failed: {str(e)}")
+
+
+@router.get("/checklist", response_model=List[Dict[str, Any]])
+def get_breach_checklist(lang: str = "en"):
+    """
+    Returns the ordered 6-stage operational incident response checklist localized by ?lang=en|hi|kn.
+    """
+    return get_ordered_checklist(lang=lang)
+
+
+@router.get("/notices")
+def get_breach_notices(lang: str = "en"):
+    """
+    Returns statutory notice titles, clauses, and disclaimers localized by ?lang=en|hi|kn.
+    """
+    header_loc = t("notices.notice_header", lang=lang)
+    return {
+        "header": str(header_loc),
+        "sections": {
+            "clause_a": str(t("notices.clause_a_title", lang=lang)),
+            "clause_b": str(t("notices.clause_b_title", lang=lang)),
+            "clause_c": str(t("notices.clause_c_title", lang=lang)),
+            "clause_d": str(t("notices.clause_d_title", lang=lang)),
+            "clause_e": str(t("notices.clause_e_title", lang=lang)),
+        },
+        "disclaimers": {
+            "not_legal_advice": str(t("notices.not_legal_advice", lang=lang)),
+            "citations_to_verify": str(t("notices.citations_to_verify", lang=lang)),
+            "readiness_aid": str(t("notices.readiness_aid_body", lang=lang)),
+            "footer": str(t("notices.footer", lang=lang)),
+            "green_wording": str(t("notices.green_wording", lang=lang)),
+        },
+        "machine_translated": getattr(header_loc, "machine_translated", False),
+        "lang": header_loc.lang,
+    }

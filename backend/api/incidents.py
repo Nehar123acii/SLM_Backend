@@ -220,6 +220,7 @@ def get_incident_clocks(
 @router.get("/{incident_ref}/checklist")
 def get_incident_checklist(
     incident_ref: str,
+    lang: str = "en",
     db: Session = Depends(get_db),
 ):
     """
@@ -235,12 +236,13 @@ def get_incident_checklist(
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
 
-    return get_ordered_checklist()
+    return get_ordered_checklist(lang=lang)
 
 
 @router.get("/{incident_ref}/notices")
 def get_incident_draft_notices(
     incident_ref: str,
+    lang: str = "en",
     db: Session = Depends(get_db),
 ):
     """
@@ -275,6 +277,7 @@ def get_incident_draft_notices(
         scenario_desc=scenario_desc,
         categories=categories,
         aware_at_dt=aware_at,
+        lang=lang,
     )
 
     board_first = generate_board_first_intimation(

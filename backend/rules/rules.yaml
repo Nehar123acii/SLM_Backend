@@ -1,15 +1,19 @@
 # 12 DPDP Readiness Rules for Kavach
-# Fields: id, title, citation_hint, severity, verify, verified, whats_right, whats_not, how_to_fix, fix_action, trigger
+# Fields: id, title_key, whats_right_key, whats_not_key, how_to_fix_key, citation_hint, severity, verify, verified, whats_right, whats_not, how_to_fix, fix_action, trigger
 
 - id: "health_data_safeguards"
+  title_key: "flags.health_data_safeguards.title"
   title: "Health data security safeguards"
   citation_hint: "s.8(5) security safeguards"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.health_data_safeguards.whats_right"
   whats_right: "No issue found by Kavach's checks: Health data is mapped to confirmed medical care purposes with safeguards."
+  whats_not_key: "flags.health_data_safeguards.whats_not"
   whats_not: "Health and diagnostic records detected without confirmed legal purpose or verified safeguards."
+  how_to_fix_key: "flags.health_data_safeguards.how_to_fix"
   how_to_fix: "Deploy robust encryption at rest and in transit, restrict access to authorized clinicians, and confirm the medical care purpose."
   fix_action: "review_columns"
   trigger:
@@ -18,14 +22,18 @@
     value: true
 
 - id: "aadhaar_in_chat"
+  title_key: "flags.aadhaar_in_chat.title"
   title: "Aadhaar present in WhatsApp/chat or free text"
   citation_hint: "s.8(5) security safeguards"
   severity: "critical"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.aadhaar_in_chat.whats_right"
   whats_right: "No issue found by Kavach's checks: Chat channels verified free of unmasked Aadhaar numbers."
+  whats_not_key: "flags.aadhaar_in_chat.whats_not"
   whats_not: "Unmasked Aadhaar numbers detected in exported WhatsApp chat conversations or unstructured notes."
+  how_to_fix_key: "flags.aadhaar_in_chat.how_to_fix"
   how_to_fix: "Immediately purge or redact unmasked Aadhaar numbers from chat channels and mandate masking in communications."
   fix_action: "review_columns"
   trigger:
@@ -34,14 +42,18 @@
     value: true
 
 - id: "aadhaar_multiple_files"
+  title_key: "flags.aadhaar_multiple_files.title"
   title: "Aadhaar stored in more than one file"
   citation_hint: "s.8(7) erasure/retention"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.aadhaar_multiple_files.whats_right"
   whats_right: "No issue found by Kavach's checks: Aadhaar data is consolidated in a single restricted file."
+  whats_not_key: "flags.aadhaar_multiple_files.whats_not"
   whats_not: "Aadhaar numbers are duplicated across multiple disparate spreadsheets or forms."
+  how_to_fix_key: "flags.aadhaar_multiple_files.how_to_fix"
   how_to_fix: "Consolidate Aadhaar records into one designated repository and execute an erasure plan for redundant files."
   fix_action: "erasure_plan"
   trigger:
@@ -50,14 +62,18 @@
     value: 1
 
 - id: "unrestricted_shared_source"
+  title_key: "flags.unrestricted_shared_source.title"
   title: "Personal data in an unrestricted shared source"
   citation_hint: "s.8(5) security safeguards"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.unrestricted_shared_source.whats_right"
   whats_right: "Owner reports no shared folders (not verified by Kavach)."
+  whats_not_key: "flags.unrestricted_shared_source.whats_not"
   whats_not: "Customer or patient data is accessible via unmanaged shared personal devices or personal drives."
+  how_to_fix_key: "flags.unrestricted_shared_source.how_to_fix"
   how_to_fix: "Migrate all customer spreadsheets to password-protected enterprise cloud storage with access logging."
   fix_action: "questionnaire"
   trigger:
@@ -66,14 +82,18 @@
     value: "yes"
 
 - id: "minors_parental_consent"
+  title_key: "flags.minors_parental_consent.title"
   title: "Possible minors present, parental consent needed"
   citation_hint: "s.9 children"
   severity: "critical"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.minors_parental_consent.whats_right"
   whats_right: "Owner reports no unconsented processing of children's personal data (not verified by Kavach)."
+  whats_not_key: "flags.minors_parental_consent.whats_not"
   whats_not: "Records of individuals under 18 years of age processed without verifiable parental or guardian consent."
+  how_to_fix_key: "flags.minors_parental_consent.how_to_fix"
   how_to_fix: "Implement verifiable parental consent verification prior to processing personal data of children."
   fix_action: "review_columns"
   trigger:
@@ -82,14 +102,18 @@
     value: true
 
 - id: "employee_data_lawful_basis"
+  title_key: "flags.employee_data_lawful_basis.title"
   title: "Employee data processing lawful basis"
   citation_hint: "s.7(i) employment"
   severity: "low"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.employee_data_lawful_basis.whats_right"
   whats_right: "No issue found by Kavach's checks: Employee records mapped to recognized employment lawful basis."
+  whats_not_key: "flags.employee_data_lawful_basis.whats_not"
   whats_not: "Staff records lack confirmed employment purpose documentation or privacy notice."
+  how_to_fix_key: "flags.employee_data_lawful_basis.how_to_fix"
   how_to_fix: "Document employment purpose for staff records under Section 7(i) and issue staff privacy notices."
   fix_action: "answer_question"
   trigger:
@@ -98,14 +122,18 @@
     value: true
 
 - id: "notice_at_collection"
+  title_key: "flags.notice_at_collection.title"
   title: "No notice at collection points"
   citation_hint: "s.5 notice"
   severity: "med"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.notice_at_collection.whats_right"
   whats_right: "Owner reports a notice is shown (not verified by Kavach)."
+  whats_not_key: "flags.notice_at_collection.whats_not"
   whats_not: "CCTV or intake collection points operate without visible, plain-language privacy notices."
+  how_to_fix_key: "flags.notice_at_collection.how_to_fix"
   how_to_fix: "Place prominent signage near CCTV cameras and add collection notices on registration forms."
   fix_action: "questionnaire"
   trigger:
@@ -114,14 +142,18 @@
     value: "no"
 
 - id: "breach_contact_process"
+  title_key: "flags.breach_contact_process.title"
   title: "No breach contact/process"
   citation_hint: "s.8(6) breach intimation"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.breach_contact_process.whats_right"
   whats_right: "Owner reports a designated breach contact person and notification procedure are established (not verified by Kavach)."
+  whats_not_key: "flags.breach_contact_process.whats_not"
   whats_not: "No designated contact person or incident process to intimate the Board and affected people without delay."
+  how_to_fix_key: "flags.breach_contact_process.how_to_fix"
   how_to_fix: "Designate a privacy/breach officer, document notification workflows, and review the breach checklist."
   fix_action: "breach_checklist"
   trigger:
@@ -130,14 +162,18 @@
     value: "no"
 
 - id: "retention_policy"
+  title_key: "flags.retention_policy.title"
   title: "No retention policy"
   citation_hint: "s.8(7) erasure/retention"
   severity: "med"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.retention_policy.whats_right"
   whats_right: "Owner reports a written data retention and scheduled disposal policy is documented (not verified by Kavach)."
+  whats_not_key: "flags.retention_policy.whats_not"
   whats_not: "No written policy exists to periodically erase personal data once legal and business purposes expire."
+  how_to_fix_key: "flags.retention_policy.how_to_fix"
   how_to_fix: "Adopt a data retention schedule and implement regular erasure cycles for expired records."
   fix_action: "erasure_plan"
   trigger:
@@ -146,14 +182,18 @@
     value: "no"
 
 - id: "data_on_personal_phones"
+  title_key: "flags.data_on_personal_phones.title"
   title: "Data on personal phones"
   citation_hint: "s.8(5) security safeguards"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.data_on_personal_phones.whats_right"
   whats_right: "Owner reports staff are prohibited from holding customer records on personal phones (not verified by Kavach)."
+  whats_not_key: "flags.data_on_personal_phones.whats_not"
   whats_not: "Staff, doctors, or contractors retain unencrypted customer files or chat backups on personal devices."
+  how_to_fix_key: "flags.data_on_personal_phones.how_to_fix"
   how_to_fix: "Enforce a formal mobile device policy requiring enterprise accounts and prohibiting local storage on personal phones."
   fix_action: "questionnaire"
   trigger:
@@ -162,14 +202,18 @@
     value: "yes"
 
 - id: "vendors_unwritten_agreement"
+  title_key: "flags.vendors_unwritten_agreement.title"
   title: "Vendors/processors without written agreement"
   citation_hint: "s.8(2) processors"
   severity: "high"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.vendors_unwritten_agreement.whats_right"
   whats_right: "Owner reports written Data Processing Agreements are executed with all processors (not verified by Kavach)."
+  whats_not_key: "flags.vendors_unwritten_agreement.whats_not"
   whats_not: "Personal data shared with third-party labs, IT software, or contractors without binding written DPAs."
+  how_to_fix_key: "flags.vendors_unwritten_agreement.how_to_fix"
   how_to_fix: "Execute written Data Processing Agreements defining processing duties with every external vendor."
   fix_action: "questionnaire"
   trigger:
@@ -178,14 +222,18 @@
     value: "yes"
 
 - id: "data_sprawl_files"
+  title_key: "flags.data_sprawl_files.title"
   title: "Same person data in many files (data sprawl)"
   citation_hint: "ss.11-14 rights"
   severity: "med"
   verify: true
   verified: false
   source_url: ""
+  whats_right_key: "flags.data_sprawl_files.whats_right"
   whats_right: "No issue found by Kavach's checks: Entity profiles consolidated with no excessive file sprawl."
+  whats_not_key: "flags.data_sprawl_files.whats_not"
   whats_not: "Individual data subjects are fragmented across three or more separate spreadsheets or systems."
+  how_to_fix_key: "flags.data_sprawl_files.how_to_fix"
   how_to_fix: "Unify duplicate customer records and archive obsolete copies using an erasure plan."
   fix_action: "erasure_plan"
   trigger:
