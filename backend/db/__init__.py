@@ -22,6 +22,7 @@ from .models import (
     EvidencePack,
     LedgerTamperBackup,
     ErasurePlan,
+    NoticeSent,
 )
 
 __all__ = [
@@ -51,4 +52,5 @@ __all__ = [
     "EvidencePack",
     "LedgerTamperBackup",
     "ErasurePlan",
+    "NoticeSent",
 ]

@@ -57,7 +57,7 @@ class Column(Base):
     dataset_id = SAColumn(String(64), ForeignKey("datasets.dataset_id"), nullable=False, index=True)
     column_name = SAColumn(String(255), nullable=False)
     original_name = SAColumn(String(255), nullable=True)  # Un-normalized source name
-    inferred_type = SAColumn(String(32), nullable=False)
+    inferred_type = SAColumn(String(32), default="TEXT", nullable=False)
     ai_category = SAColumn(String(64), nullable=True)
     ai_sensitivity = SAColumn(String(64), nullable=True)
     ai_confidence = SAColumn(Float, nullable=True)
@@ -209,6 +209,10 @@ class Incident(Base):
     needs_human_review = SAColumn(Boolean, default=True, nullable=False)
     checklist = SAColumn(Text, nullable=False)  # JSON array string
     evidence_refs = SAColumn(Text, nullable=False)  # JSON array string
+    affected_source_ids = SAColumn(Text, nullable=True)  # JSON array of source dataset IDs or filenames
+    aware_at = SAColumn(DateTime, nullable=True)
+    board_extension_requested = SAColumn(Boolean, default=False, nullable=False)
+    severity_level = SAColumn(String(32), default="MEDIUM", nullable=False)  # LOW / MEDIUM / HIGH
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
     updated_at = SAColumn(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -246,6 +250,7 @@ class Occurrence(Base):
     value_hmac = SAColumn(String(64), nullable=False, index=True)
     origin = SAColumn(String(32), nullable=False, default="rule")  # rule | slm | ocr
     ocr_conf = SAColumn(Float, nullable=True)
+    is_minor = SAColumn(Boolean, default=False, nullable=True)
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
 
     person = relationship("Person", back_populates="occurrences")
@@ -413,5 +418,22 @@ class ErasurePlan(Base):
     executed_at = SAColumn(DateTime, nullable=True)
 
     person = relationship("Person")
+
+
+class NoticeSent(Base):
+    """
+    Log of statutory and individual breach notifications sent.
+    Stores recipient person_id reference, channel enum, timestamp, and notice type.
+    Never stores contact values or personal data.
+    """
+    __tablename__ = "notices_sent"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    incident_id = SAColumn(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
+    incident_ref = SAColumn(String(64), nullable=True, index=True)
+    recipient_ref = SAColumn(Integer, nullable=True, index=True)  # person_id
+    channel = SAColumn(String(32), nullable=False)  # email | phone | sms | postal | in_person
+    sent_at = SAColumn(DateTime, default=utc_now, nullable=False)
+    notice_type = SAColumn(String(32), nullable=False)  # individual | board_intimation | board_detailed
 
 

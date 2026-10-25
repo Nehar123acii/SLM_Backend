@@ -1,5 +1,5 @@
 import json
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -11,16 +11,26 @@ from backend.schemas import (
     IncidentStatusUpdate,
     IncidentChecklistUpdate,
     IncidentEvidenceCreate,
+    NoticeSentCreate,
+    NoticeSentResponse,
+)
+from backend.services.breach import (
+    blast_radius,
+    calculate_clocks,
+    generate_board_detailed_report,
+    generate_board_first_intimation,
+    generate_individual_notice,
+    get_notices_sent_summary,
+    get_ordered_checklist,
 )
 from backend.services.incidents import IncidentService
 
-# TODO: Add authentication & authorization layer before production deployment
-
-router = APIRouter(prefix="/api/v1/incidents", tags=["incidents"])
+router = APIRouter(tags=["incidents"])
 
 
 def serialize_incident(inc: Incident) -> dict:
     return {
+        "id": inc.id,
         "incident_ref": inc.incident_ref,
         "reporter_role": inc.reporter_role,
         "incident_type": inc.incident_type,
@@ -38,6 +48,10 @@ def serialize_incident(inc: Incident) -> dict:
         "needs_human_review": inc.needs_human_review,
         "checklist": json.loads(inc.checklist) if inc.checklist else [],
         "evidence_refs": json.loads(inc.evidence_refs) if inc.evidence_refs else [],
+        "affected_source_ids": json.loads(inc.affected_source_ids) if getattr(inc, "affected_source_ids", None) else [],
+        "aware_at": inc.aware_at.isoformat() if getattr(inc, "aware_at", None) else None,
+        "board_extension_requested": getattr(inc, "board_extension_requested", False),
+        "severity_level": getattr(inc, "severity_level", "MEDIUM"),
         "created_at": inc.created_at,
         "updated_at": inc.updated_at,
     }
@@ -50,15 +64,26 @@ def create_incident(
 ):
     """
     Creates a new breach incident record.
-    Calls mock AI breach extractor and populates 10-step regulatory response checklist.
+    Rejects report text containing raw personal data identifiers.
+    Logs incident_opened to tamper-evident ledger.
     """
-    inc = IncidentService.create_incident(
-        db=db,
-        report_text=payload.report_text,
-        reporter_role=payload.reporter_role,
-        discovery_datetime_hint=payload.discovery_datetime_hint,
-    )
-    return serialize_incident(inc)
+    try:
+        inc = IncidentService.create_incident(
+            db=db,
+            report_text=payload.report_text,
+            reporter_role=payload.reporter_role,
+            discovery_datetime_hint=payload.discovery_datetime_hint,
+            incident_type=payload.incident_type,
+            affected_source_ids=payload.affected_source_ids,
+            aware_at=payload.aware_at,
+            board_extension_requested=payload.board_extension_requested,
+            severity_level=payload.severity_level,
+        )
+        return serialize_incident(inc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Incident creation failed: {str(e)}")
 
 
 @router.get("", response_model=List[IncidentResponse])
@@ -82,9 +107,9 @@ def get_incident(
     db: Session = Depends(get_db),
 ):
     """
-    Retrieves full details of a breach incident.
+    Retrieves full details of a breach incident (accepts numeric id or incident_ref).
     """
-    inc = db.query(Incident).filter_by(incident_ref=incident_ref).first()
+    inc = IncidentService.get_incident(db, incident_ref)
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
     return serialize_incident(inc)
@@ -112,7 +137,7 @@ def update_incident_checklist(
     db: Session = Depends(get_db),
 ):
     """
-    Updates the 10-step checklist items for an incident.
+    Updates the checklist items for an incident and records incident_step in ledger.
     """
     inc = IncidentService.update_checklist(db, incident_ref, payload.checklist)
     if not inc:
@@ -133,3 +158,158 @@ def append_incident_evidence(
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
     return serialize_incident(inc)
+
+
+@router.post("/{incident_ref}/notices-sent", response_model=NoticeSentResponse, status_code=status.HTTP_201_CREATED)
+def record_notice_sent_endpoint(
+    incident_ref: str,
+    payload: NoticeSentCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Records a sent breach notification (recipient person_id, channel, timestamp, notice_type).
+    Stores zero contact values or personal data.
+    Appends notice_sent event to ledger.
+    """
+    inc = IncidentService.get_incident(db, incident_ref)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
+
+    record = IncidentService.record_notice_sent(
+        db=db,
+        incident_ref_or_id=inc.id,
+        recipient_ref=payload.recipient_ref,
+        channel=payload.channel,
+        notice_type=payload.notice_type,
+        sent_at=payload.sent_at,
+    )
+    return {
+        "id": record.id,
+        "incident_id": record.incident_id,
+        "incident_ref": record.incident_ref,
+        "recipient_ref": record.recipient_ref,
+        "channel": record.channel,
+        "notice_type": record.notice_type,
+        "sent_at": record.sent_at,
+    }
+
+
+@router.get("/{incident_ref}/clocks")
+def get_incident_clocks(
+    incident_ref: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns statutory DPDP Rule 7 countdown clocks for an incident.
+    Module label: 'readiness for obligations from May 2027'.
+    """
+    inc = IncidentService.get_incident(db, incident_ref)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
+
+    aware_at = inc.aware_at or inc.created_at
+    board_ext = bool(getattr(inc, "board_extension_requested", False))
+
+    clocks = calculate_clocks(
+        aware_at=aware_at,
+        board_extension_requested=board_ext,
+    )
+    return clocks
+
+
+@router.get("/{incident_ref}/checklist")
+def get_incident_checklist(
+    incident_ref: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns the ordered 6-stage operational incident response checklist:
+    1. Contain
+    2. Preserve Evidence
+    3. Assess
+    4. Notify
+    5. Recover
+    6. Review
+    """
+    inc = IncidentService.get_incident(db, incident_ref)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
+
+    return get_ordered_checklist()
+
+
+@router.get("/{incident_ref}/notices")
+def get_incident_draft_notices(
+    incident_ref: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Generates draft statutory notices keyed to required clauses.
+    All outputs strictly marked DRAFT SIMULATION. Zero raw PII.
+    Item (vi) of Board Detailed Report auto-populates summary from notices_sent table.
+    """
+    inc = IncidentService.get_incident(db, incident_ref)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_ref}' not found.")
+
+    aware_at = inc.aware_at or inc.created_at
+    affected_sources: List[str] = []
+    if getattr(inc, "affected_source_ids", None):
+        try:
+            affected_sources = json.loads(inc.affected_source_ids)
+        except Exception:
+            pass
+
+    # Compute blast radius from affected sources if available
+    blast = blast_radius(db, affected_sources)
+    categories = list(blast.get("category_breakdown", {}).keys())
+
+    # Get notices sent summary
+    notices_sent_summary = get_notices_sent_summary(db, incident_id=inc.id, incident_ref=inc.incident_ref)
+
+    scenario_title = f"{inc.incident_type.replace('_', ' ').title()}"
+    scenario_desc = inc.draft_summary or "Security incident requiring containment and regulatory assessment."
+
+    individual_notice = generate_individual_notice(
+        scenario_title=scenario_title,
+        scenario_desc=scenario_desc,
+        categories=categories,
+        aware_at_dt=aware_at,
+    )
+
+    board_first = generate_board_first_intimation(
+        scenario_title=scenario_title,
+        scenario_desc=scenario_desc,
+        exposure_types=["confidentiality"],
+        affected_sources=affected_sources,
+        records_count=blast.get("records_count", 0),
+        confirmed_people=blast.get("confirmed_people", 0),
+        possible_people=blast.get("possible_people", 0),
+        categories=categories,
+        aware_at_dt=aware_at,
+    )
+
+    board_detailed = generate_board_detailed_report(
+        scenario_title=scenario_title,
+        scenario_desc=scenario_desc,
+        exposure_types=["confidentiality"],
+        affected_sources=affected_sources,
+        records_count=blast.get("records_count", 0),
+        confirmed_people=blast.get("confirmed_people", 0),
+        possible_people=blast.get("possible_people", 0),
+        categories=categories,
+        aware_at_dt=aware_at,
+        notices_sent_summary=notices_sent_summary,
+    )
+
+    return {
+        "incident_ref": inc.incident_ref,
+        "notices": {
+            "individual_notice": individual_notice,
+            "board_first_intimation": board_first,
+            "board_detailed_report": board_detailed,
+        },
+        "notices_sent_summary": notices_sent_summary,
+        "only_channel_warnings": blast.get("only_channel_warnings", []),
+        "watermark": "DRAFT SIMULATION",
+    }

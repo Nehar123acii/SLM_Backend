@@ -183,6 +183,28 @@ class IncidentCreate(BaseModel):
     report_text: str = Field(..., max_length=10000)
     reporter_role: Optional[str] = Field(None, max_length=128)
     discovery_datetime_hint: Optional[str] = None
+    incident_type: Optional[str] = None
+    affected_source_ids: Optional[List[str]] = None
+    aware_at: Optional[Union[str, datetime]] = None
+    board_extension_requested: bool = False
+    severity_level: Optional[str] = "MEDIUM"
+
+
+class NoticeSentCreate(BaseModel):
+    recipient_ref: int
+    channel: str = Field(..., pattern="^(email|phone|sms|postal|in_person|other)$")
+    notice_type: str = Field("individual", pattern="^(individual|board_intimation|board_detailed|other)$")
+    sent_at: Optional[datetime] = None
+
+
+class NoticeSentResponse(ORMBase):
+    id: int
+    incident_id: Optional[int] = None
+    incident_ref: Optional[str] = None
+    recipient_ref: Optional[int] = None
+    channel: str
+    notice_type: str
+    sent_at: datetime
 
 
 class IncidentResponse(ORMBase):
