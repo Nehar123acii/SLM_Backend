@@ -307,11 +307,22 @@ class LedgerEvent(Base):
 
     id = SAColumn(Integer, primary_key=True, autoincrement=True)
     seq = SAColumn(Integer, nullable=False, unique=True, index=True)
-    event_type = SAColumn(String(64), nullable=False)
+    ts = SAColumn(String(64), nullable=True)
+    type = SAColumn(String(64), nullable=True)
+    event_type = SAColumn(String(64), nullable=True)
     payload_json = SAColumn(Text, nullable=False)
     prev_hash = SAColumn(String(64), nullable=False)
     hash = SAColumn(String(64), nullable=False)
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+    def __init__(self, **kwargs):
+        if "ts" not in kwargs or kwargs["ts"] is None:
+            kwargs["ts"] = datetime.now(timezone.utc).isoformat()
+        if "type" not in kwargs or kwargs["type"] is None:
+            kwargs["type"] = kwargs.get("event_type", "unknown")
+        if "event_type" not in kwargs or kwargs["event_type"] is None:
+            kwargs["event_type"] = kwargs.get("type", "unknown")
+        super().__init__(**kwargs)
 
 
 class BusinessState(Base):
@@ -362,8 +373,9 @@ class EvidencePack(Base):
     pack_id = SAColumn(String(128), primary_key=True)
     created_at = SAColumn(String(64), nullable=False)
     head_hash = SAColumn(String(64), nullable=False)
-    score = SAColumn(Integer, nullable=False)
-    chain_ok = SAColumn(Integer, nullable=False)
+    manifest_sha256 = SAColumn(String(64), nullable=True)
+    score = SAColumn(Integer, default=100, nullable=True)
+    chain_ok = SAColumn(Integer, default=1, nullable=True)
     path = SAColumn(String(512), nullable=False)
 
 

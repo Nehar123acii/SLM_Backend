@@ -7,7 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.db.engine import engine
 from backend.db.models import Base
-from backend.api import inventory_router, privacy_requests_router, incidents_router, purposes_router
+from backend.api import (
+    inventory_router,
+    privacy_requests_router,
+    incidents_router,
+    purposes_router,
+    ledger_router,
+    evidence_router,
+)
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -49,6 +56,8 @@ def create_app() -> FastAPI:
     app.include_router(incidents_router)
     app.include_router(purposes_router)
     app.include_router(purposes_router, prefix="/api/v1")
+    app.include_router(ledger_router)
+    app.include_router(evidence_router)
 
     @app.get("/health", tags=["health"])
     def health_check():

@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -341,6 +342,23 @@ class InventoryService:
                     "rows": total_raw_rows,
                 },
             )
+
+            # Log ledger event 'upload' (dataset_id, row_count, file sha256)
+            try:
+                import hashlib
+                from backend.services.ledger import append_event
+                file_sha256 = hashlib.sha256(file_bytes).hexdigest()
+                append_event(
+                    db,
+                    "upload",
+                    {
+                        "dataset_id": dataset_id,
+                        "row_count": total_raw_rows,
+                        "file_sha256": file_sha256,
+                    },
+                )
+            except Exception as e:
+                logger.warning("Ledger append for upload failed: %s", str(e))
 
             db.commit()
             db.refresh(dataset_obj)

@@ -303,6 +303,30 @@ def record_answer(
             for old in old_links:
                 old.superseded_by = first_new_id
 
+    # Log ledger event 'answer' (column_id, segment, purpose_ids, status, answered_by_hash)
+    try:
+        from backend.security import hmac_value
+        from backend.services.ledger import append_event
+
+        answered_by_hash = hmac_value("name", answered_by) if answered_by else "unknown"
+        status_str = "unknown" if unknown else "confirmed"
+        clean_pids = [str(p) for p in (purpose_ids or [])]
+
+        append_event(
+            db,
+            "answer",
+            {
+                "column_id": column_id,
+                "segment": segment,
+                "purpose_ids": clean_pids,
+                "status": status_str,
+                "answered_by_hash": answered_by_hash,
+            },
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("purposes").warning("Ledger append for answer failed: %s", str(e))
+
     db.commit()
     return created_records
 
