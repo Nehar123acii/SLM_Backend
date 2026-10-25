@@ -29,7 +29,10 @@ from backend.security import normalise, mask, hmac_value
 # Category & Impact Tier Classification
 # ---------------------------------------------------------------------------
 
-IDENTIFIER_CATEGORIES = {"phone", "email", "aadhaar", "pan", "name"}
+IDENTIFIER_CATEGORIES = {
+    "phone", "email", "aadhaar", "pan", "name",
+    "bank_account", "gstin", "ifsc", "upi"
+}
 
 STRONG_CATEGORIES = {"phone", "email", "aadhaar"}
 
@@ -44,7 +47,8 @@ def classify_column_category(
 ) -> str:
     """
     Categorizes column into one of:
-    phone, email, aadhaar, pan, name, dob, address, health, other
+    phone, email, aadhaar, pan, name, dob, address, health,
+    bank_account, gstin, ifsc, upi, other
     """
     c_lower = col_name.lower().replace("-", "_").strip()
     flags = flags or []
@@ -112,19 +116,49 @@ def classify_column_category(
     ):
         return "health"
 
+    # 9. Bank Account
+    if (
+        "BANK_ACCOUNT" in flags
+        or any(k in c_lower for k in ["bank_account", "account_no", "account_number", "bank_acc", "acc_no"])
+    ):
+        return "bank_account"
+
+    # 10. GSTIN
+    if (
+        "GSTIN" in flags
+        or "gstin" in c_lower
+        or (c_lower.startswith("gst") and "no" in c_lower)
+    ):
+        return "gstin"
+
+    # 11. IFSC
+    if (
+        "IFSC" in flags
+        or "ifsc" in c_lower
+    ):
+        return "ifsc"
+
+    # 12. UPI
+    if (
+        "UPI" in flags
+        or "upi" in c_lower
+        or "vpa" in c_lower
+    ):
+        return "upi"
+
     return "other"
 
 
 def compute_impact_tier(category: str) -> str:
     """
     Kavach's own 'impact if leaked' tier (1-3):
-    Tier 3: aadhaar, pan, health
-    Tier 2: phone, email, name, dob, address
+    Tier 3: aadhaar, pan, health, bank_account
+    Tier 2: phone, email, name, dob, address, gstin, ifsc, upi
     Tier 1: other
     """
-    if category in ["aadhaar", "pan", "health"]:
+    if category in ["aadhaar", "pan", "health", "bank_account"]:
         return "3"
-    elif category in ["phone", "email", "name", "dob", "address"]:
+    elif category in ["phone", "email", "name", "dob", "address", "gstin", "ifsc", "upi"]:
         return "2"
     else:
         return "1"
