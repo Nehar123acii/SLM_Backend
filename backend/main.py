@@ -19,6 +19,7 @@ from backend.api import (
     breach_router,
     rights_router,
     cases_router,
+    graphs_router,
 )
 
 logging.basicConfig(
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(breach_router)
     app.include_router(rights_router)
     app.include_router(cases_router)
+    app.include_router(graphs_router)
 
     @app.get("/health", tags=["health"])
     def health_check():
