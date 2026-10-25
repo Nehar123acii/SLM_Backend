@@ -27,7 +27,7 @@ import logging
 import os
 import shutil
 import pytest
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat
 import pymupdf
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -566,3 +566,122 @@ def test_optional_live_tesseract_smoke_test(tmp_path):
     df, warnings, mapping, meta = extractor.extract(img_path)
     assert meta["pages_ocr"] == 1
     assert len(df) > 0
+
+
+@pytest.mark.asyncio
+async def test_live_dark_mode_ocr_upload_and_provenance(tmp_path, client: AsyncClient, db_session: Session):
+    """
+    TASK K15 Live Test:
+    Generates a dark-mode image, uploads it through the real API (/api/v1/inventory/upload),
+    and asserts:
+    - Occurrence exists with origin 'ocr'
+    - A bbox locator is present (in row_ref, locator, or column locator)
+    - A non-null ocr_conf is recorded
+    - A masked sample is recorded (e.g. 98****1234)
+    - NO raw phone anywhere in the DB bytes
+    Skips cleanly ONLY when Tesseract is not installed.
+    """
+    tess_path = resolve_tesseract_cmd()
+    if not tess_path:
+        pytest.skip("Local Tesseract OCR executable not detected on host system.")
+
+    phone_raw = "9876501234"
+
+    # 1. Create a dark-mode image (mean brightness < 100)
+    bg_color = (22, 22, 26)
+    fg_color = (240, 240, 245)
+    img = Image.new("RGB", (900, 400), color=bg_color)
+    draw = ImageDraw.Draw(img)
+
+    font = None
+    for fp in [r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\Nirmala.ttc", r"C:\Windows\Fonts\calibri.ttf"]:
+        if os.path.exists(fp):
+            try:
+                font = ImageFont.truetype(fp, 26)
+                break
+            except Exception:
+                continue
+
+    draw.text((40, 40), "Hospital Diagnostic Consultation Desk", font=font, fill=fg_color)
+    draw.text((40, 100), f"Primary Contact Phone: {phone_raw}", font=font, fill=fg_color)
+    draw.text((40, 160), "Email: patient.records@kavach.test", font=font, fill=fg_color)
+    draw.text((40, 220), "Status: Verified appointment scheduled for tomorrow", font=font, fill=fg_color)
+
+    # Verify mean brightness is below 100 (dark mode)
+    stat = ImageStat.Stat(img.convert("L"))
+    assert stat.mean[0] < 100.0, f"Expected dark-mode image mean brightness < 100, got {stat.mean[0]}"
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    file_bytes = buf.getvalue()
+
+    # 2. Upload through real API
+    response = await client.post(
+        "/api/v1/inventory/upload",
+        files={"file": ("dark_consult_card.png", file_bytes, "image/png")},
+        data={"source_type": "document_ocr"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["source_type"] == "document_ocr"
+    assert data["status"] in ["SUCCESS", "AI_CLASSIFIED"]
+
+    # 3. Assert occurrence exists with origin 'ocr', bbox locator, non-null ocr_conf, masked sample
+    db_session.expire_all()
+    from backend.db.models import Occurrence, Column as SAColumn
+    occs = (
+        db_session.query(Occurrence)
+        .join(SAColumn, Occurrence.column_id == SAColumn.id)
+        .filter(Occurrence.origin == "ocr")
+        .all()
+    )
+    assert len(occs) > 0, "No occurrences recorded with origin 'ocr'"
+
+    phone_occ = next((o for o in occs if o.column.category == "phone" or "1234" in (o.masked_sample or "")), None)
+    assert phone_occ is not None, f"Phone occurrence not found in OCR occurrences: {[o.masked_sample for o in occs]}"
+
+    # Verify origin is 'ocr'
+    assert phone_occ.origin == "ocr"
+
+    # Verify bbox locator
+    locator_candidates = [
+        phone_occ.row_ref or "",
+        getattr(phone_occ, "locator", "") or "",
+        (phone_occ.column.locator if phone_occ.column else "") or "",
+    ]
+    assert any("bbox" in loc.lower() for loc in locator_candidates), (
+        f"Expected bbox locator, got candidates: {locator_candidates}"
+    )
+
+    # Verify non-null ocr_conf
+    assert phone_occ.ocr_conf is not None
+    assert phone_occ.ocr_conf > 0.0
+
+    # Verify masked sample
+    assert phone_occ.masked_sample is not None
+    assert phone_raw not in phone_occ.masked_sample
+    assert "1234" in phone_occ.masked_sample
+
+    # 4. Assert NO raw phone anywhere in the DB bytes
+    db_session.commit()
+    from sqlalchemy import text
+    try:
+        db_session.execute(text("PRAGMA wal_checkpoint(FULL)"))
+    except Exception:
+        pass
+
+    db_path = None
+    bind_engine = db_session.get_bind()
+    if bind_engine and hasattr(bind_engine, "url") and bind_engine.url.database:
+        db_path = bind_engine.url.database
+
+    if db_path and os.path.exists(db_path):
+        with open(db_path, "rb") as f:
+            raw_db = f.read()
+        wal_path = f"{db_path}-wal"
+        if os.path.exists(wal_path):
+            with open(wal_path, "rb") as f:
+                raw_db += f.read()
+
+        assert phone_raw.encode("utf-8") not in raw_db, f"Raw phone '{phone_raw}' found in SQLite binary bytes!"
+

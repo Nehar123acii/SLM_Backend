@@ -256,6 +256,13 @@ class Occurrence(Base):
     person = relationship("Person", back_populates="occurrences")
     column = relationship("Column")
 
+    @property
+    def locator(self) -> str:
+        col_loc = self.column.locator if self.column else ""
+        if self.row_ref:
+            return f"{col_loc}|{self.row_ref}"
+        return col_loc
+
 
 class Purpose(Base):
     """

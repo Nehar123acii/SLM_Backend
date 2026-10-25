@@ -23,12 +23,13 @@ import shutil
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from PIL import Image
+from PIL import Image, ImageOps, ImageStat
 import pandas as pd
 import pymupdf
 import pytesseract
 
 from backend.config import settings
+from backend.security import mask
 
 logger = logging.getLogger("ocr_engine")
 
@@ -98,8 +99,9 @@ SUPPORTED_OCR_LANGUAGES: Dict[str, str] = {
 }
 
 # Standard Windows paths where Tesseract is frequently installed
+DEFAULT_WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 WINDOWS_TESSERACT_PATHS = [
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    DEFAULT_WINDOWS_TESSERACT,
     r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
 ]
@@ -113,19 +115,28 @@ def resolve_tesseract_cmd() -> Optional[str]:
     Finds the Tesseract executable on the host system:
     1. Configured settings.tesseract_cmd or TESSERACT_CMD env var
     2. PATH lookup via shutil.which('tesseract')
-    3. Common Windows installation locations
+    3. C:\\Program Files\\Tesseract-OCR\\tesseract.exe
+    4. Common Windows installation locations
     Configures pytesseract.pytesseract.tesseract_cmd if found.
     """
-    configured = settings.tesseract_cmd or os.environ.get("TESSERACT_CMD")
-    if configured and os.path.exists(configured):
-        pytesseract.pytesseract.tesseract_cmd = configured
-        return configured
+    # 1. Env TESSERACT_CMD or settings.tesseract_cmd
+    env_cmd = os.environ.get("TESSERACT_CMD") or getattr(settings, "tesseract_cmd", None)
+    if env_cmd and os.path.exists(env_cmd):
+        pytesseract.pytesseract.tesseract_cmd = env_cmd
+        return env_cmd
 
+    # 2. PATH lookup
     in_path = shutil.which("tesseract")
     if in_path:
         pytesseract.pytesseract.tesseract_cmd = in_path
         return in_path
 
+    # 3. C:\Program Files\Tesseract-OCR\tesseract.exe
+    if os.path.exists(DEFAULT_WINDOWS_TESSERACT):
+        pytesseract.pytesseract.tesseract_cmd = DEFAULT_WINDOWS_TESSERACT
+        return DEFAULT_WINDOWS_TESSERACT
+
+    # 4. Common Windows installation locations
     if os.name == "nt":
         for win_path in WINDOWS_TESSERACT_PATHS:
             if os.path.exists(win_path):
@@ -151,27 +162,90 @@ def get_available_tesseract_languages() -> List[str]:
 
 def normalize_and_validate_language(lang_hint: Optional[str]) -> str:
     """
-    Normalizes language hint to 3-letter Tesseract code ('eng', 'hin', 'kan').
+    Normalizes language hint to 3-letter Tesseract code ('eng', 'hin', 'kan'),
+    or combined codes ('eng+hin+kan').
     Validates availability in Tesseract tessdata.
     """
-    raw = (lang_hint or settings.ocr_default_language or "eng").strip().lower()
-    if raw not in SUPPORTED_OCR_LANGUAGES:
-        raise UnsupportedLanguageError(
-            f"Unsupported OCR language '{lang_hint}'. Permitted languages: English ('eng'), "
-            f"Hindi ('hin'), Kannada ('kan')."
-        )
-    target_code = SUPPORTED_OCR_LANGUAGES[raw]
+    raw = (lang_hint or getattr(settings, "ocr_default_language", "eng") or "eng").strip().lower()
+    parts = [p.strip() for p in raw.split("+") if p.strip()]
+    normalized_parts = []
+    for p in parts:
+        if p not in SUPPORTED_OCR_LANGUAGES:
+            raise UnsupportedLanguageError(
+                f"Unsupported OCR language '{p}'. Permitted languages: English ('eng'), "
+                f"Hindi ('hin'), Kannada ('kan')."
+            )
+        normalized_parts.append(SUPPORTED_OCR_LANGUAGES[p])
 
-    # Verify language is installed in Tesseract
+    target_code = "+".join(normalized_parts)
+
+    # Verify each language is installed in Tesseract
     available = get_available_tesseract_languages()
-    if available and target_code not in available:
-        raise LanguageNotInstalledError(
-            f"Tesseract language data for '{target_code}' is not installed in tessdata. "
-            f"Available languages: {available}. To process {target_code.upper()} documents, "
-            f"download '{target_code}.traineddata' from github.com/tesseract-ocr/tessdata "
-            f"and place it in your Tesseract tessdata directory."
-        )
+    if available:
+        for code in normalized_parts:
+            if code not in available:
+                raise LanguageNotInstalledError(
+                    f"Tesseract language data for '{code}' is not installed in tessdata. "
+                    f"Available languages: {available}. To process {code.upper()} documents, "
+                    f"download '{code}.traineddata' from github.com/tesseract-ocr/tessdata "
+                    f"and place it in your Tesseract tessdata directory."
+                )
     return target_code
+
+
+# ---------------------------------------------------------------------------
+# Image Preprocessing & Token Sanitization
+# ---------------------------------------------------------------------------
+RE_PHONE_TOKEN = re.compile(r"(?:\+91[\-\s]?|91[\-\s]?|0)?[6-9](?:[\-\s]?\d){9}")
+RE_EMAIL_TOKEN = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+RE_AADHAAR_TOKEN = re.compile(r"\b\d{4}[\s-]\d{4}[\s-]\d{4}\b|\b\d{12}\b")
+RE_PAN_TOKEN = re.compile(r"\b[A-Za-z]{5}\d{4}[A-Za-z]\b")
+
+
+def _mask_token_sensitive(token: str) -> str:
+    """Masks identifier values in bounding box tokens so raw data is never persisted in SQLite."""
+    clean = token.strip()
+    if RE_PHONE_TOKEN.search(clean):
+        return mask("phone", clean)
+    if RE_EMAIL_TOKEN.search(clean):
+        return mask("email", clean)
+    if RE_AADHAAR_TOKEN.search(clean):
+        return mask("aadhaar", clean)
+    if RE_PAN_TOKEN.search(clean):
+        return mask("pan", clean)
+    return clean
+
+
+def preprocess_image_for_ocr(image: Image.Image) -> Tuple[Image.Image, float]:
+    """
+    Preprocesses an image before OCR recognition:
+    1. Converts to grayscale.
+    2. Inverts if dark-mode (mean brightness below 100).
+    3. Auto-contrast enhancement.
+    4. Upscales small images (minimum width 1200 px).
+    Returns (processed_image, scale_factor).
+    """
+    gray = image.convert("L")
+
+    # Invert if dark-mode (mean brightness below 100)
+    stat = ImageStat.Stat(gray)
+    mean_brightness = stat.mean[0] if stat.mean else 128.0
+    if mean_brightness < 100.0:
+        gray = ImageOps.invert(gray)
+
+    # Auto-contrast enhancement
+    gray = ImageOps.autocontrast(gray)
+
+    # Upscale small images (minimum width 1200 px)
+    orig_w, orig_h = gray.size
+    scale = 1.0
+    if orig_w < 1200:
+        scale = 1200.0 / orig_w
+        new_w = 1200
+        new_h = int(round(orig_h * scale))
+        gray = gray.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    return gray, scale
 
 
 # ---------------------------------------------------------------------------
@@ -318,10 +392,16 @@ class DocumentExtractor:
         language: Optional[str] = None,
         max_pages: Optional[int] = None,
         min_native_chars: Optional[int] = None,
+        confidence_threshold: Optional[float] = None,
     ) -> None:
         self.language = normalize_and_validate_language(language)
         self.max_pages = max_pages or settings.ocr_max_pages
         self.min_native_chars = min_native_chars or settings.ocr_min_native_text_chars
+        self.confidence_threshold = (
+            confidence_threshold
+            if confidence_threshold is not None
+            else getattr(settings, "ocr_confidence_threshold", 0.8)
+        )
 
     def extract(self, file_path: str) -> Tuple[pd.DataFrame, List[str], Dict[str, str], Dict[str, Any]]:
         """
@@ -636,7 +716,7 @@ class DocumentExtractor:
                 "bbox": [round(float(x0), 1), round(float(y0), 1), round(float(x1), 1), round(float(y1), 1)],
                 "words": [
                     {
-                        "text": str(w[4]),
+                        "text": _mask_token_sensitive(str(w[4])),
                         "bbox": [round(float(w[0]), 1), round(float(w[1]), 1), round(float(w[2]), 1), round(float(w[3]), 1)],
                         "confidence": 1.0,
                     }
@@ -669,11 +749,16 @@ class DocumentExtractor:
     def _parse_ocr_image(
         self, image: Image.Image, page_num: int, source_name: str
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], str, Optional[str]]:
-        """Executes OCR on an image and builds line records with coordinates and confidences."""
-        ocr_data = run_ocr_on_image(image, lang=self.language)
+        """
+        Executes OCR on an image with preprocessing and builds line records
+        with coordinates and per-token confidences.
+        """
+        preprocessed_img, scale = preprocess_image_for_ocr(image)
+        ocr_data = run_ocr_on_image(preprocessed_img, lang=self.language)
 
         records: List[Dict[str, Any]] = []
         bboxes: List[Dict[str, Any]] = []
+        conf_threshold = getattr(self, "confidence_threshold", 0.8)
 
         texts = ocr_data.get("text", [])
         confs = ocr_data.get("conf", [])
@@ -708,10 +793,15 @@ class DocumentExtractor:
             w = widths[idx] if idx < len(widths) else 0
             h = heights[idx] if idx < len(heights) else 0
 
+            # Scale coordinates back to original image space
+            orig_bbox = [c / scale for c in [float(x), float(y), float(x + w), float(y + h)]]
+            is_low_conf = (conf_normalized < conf_threshold)
+
             lines.setdefault((b_num, l_num), []).append({
                 "text": w_text,
                 "conf": conf_normalized,
-                "bbox": [float(x), float(y), float(x + w), float(y + h)],
+                "bbox": orig_bbox,
+                "low_confidence": is_low_conf,
             })
 
         line_idx = 1
@@ -727,8 +817,15 @@ class DocumentExtractor:
             x1 = max(w["bbox"][2] for w in word_list)
             y1 = max(w["bbox"][3] for w in word_list)
 
+            bx_int = int(round(x0))
+            by_int = int(round(y0))
+            bw_int = int(round(x1 - x0))
+            bh_int = int(round(y1 - y0))
+            bbox_locator = f"page_{page_num}_bbox_{bx_int}_{by_int}_{bw_int}_{bh_int}"
+
             record_ref = f"DOC-P{page_num:02d}-L{line_idx:03d}"
-            status = "LOW_CONFIDENCE" if avg_conf < 0.60 else "SUCCESS"
+            status = "LOW_CONFIDENCE" if avg_conf < conf_threshold else "SUCCESS"
+            is_line_low_conf = (status == "LOW_CONFIDENCE")
 
             records.append({
                 "record_ref": record_ref,
@@ -739,6 +836,8 @@ class DocumentExtractor:
                 "confidence": avg_conf,
                 "char_length": len(line_str),
                 "status": status,
+                "low_confidence": is_line_low_conf,
+                "bbox_locator": bbox_locator,
                 "source_reference": f"{source_name}:page_{page_num}:line_{line_idx}",
             })
             bboxes.append({
@@ -746,11 +845,13 @@ class DocumentExtractor:
                 "page_number": page_num,
                 "line_number": line_idx,
                 "bbox": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
+                "bbox_locator": bbox_locator,
                 "words": [
                     {
-                        "text": w["text"],
+                        "text": _mask_token_sensitive(w["text"]),
                         "bbox": [round(c, 1) for c in w["bbox"]],
                         "confidence": w["conf"],
+                        "low_confidence": w.get("low_confidence", False),
                     }
                     for w in word_list
                 ],
@@ -769,12 +870,13 @@ class DocumentExtractor:
                 "confidence": 0.0,
                 "char_length": 0,
                 "status": "EMPTY",
+                "low_confidence": True,
                 "source_reference": f"{source_name}:page_{page_num}:line_1",
             })
             return records, bboxes, "EMPTY", "Page contains no readable OCR text."
 
         avg_page_conf = sum(r["confidence"] for r in records) / len(records)
-        page_status = "LOW_CONFIDENCE" if avg_page_conf < 0.60 else "SUCCESS"
-        page_warn = f"Low OCR recognition confidence ({avg_page_conf:.2f} < 0.60). Human review advised." if page_status == "LOW_CONFIDENCE" else None
+        page_status = "LOW_CONFIDENCE" if avg_page_conf < conf_threshold else "SUCCESS"
+        page_warn = f"Low OCR recognition confidence ({avg_page_conf:.2f} < {conf_threshold:.2f}). Human review advised." if page_status == "LOW_CONFIDENCE" else None
 
         return records, bboxes, page_status, page_warn

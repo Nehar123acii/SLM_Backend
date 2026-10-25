@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     tesseract_cmd: Optional[str] = None
     tessdata_dir: Optional[str] = None
     ocr_default_language: str = "eng"
+    ocr_confidence_threshold: float = 0.8
     ocr_max_file_size_bytes: int = 25 * 1024 * 1024  # 25 MB
     ocr_max_pages: int = 100
     ocr_timeout_seconds: float = 30.0

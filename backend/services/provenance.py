@@ -264,7 +264,10 @@ def resolve_entities_and_record_occurrences(
 
     for idx in range(len(cleaned_df)):
         line_num = cleaned_df.at[idx, "line_number"] if "line_number" in cleaned_df.columns else None
-        row_ref = str(line_num) if line_num is not None else str(idx)
+        if is_ocr and "bbox_locator" in cleaned_df.columns and pd.notna(cleaned_df.at[idx, "bbox_locator"]):
+            row_ref = str(cleaned_df.at[idx, "bbox_locator"])
+        else:
+            row_ref = str(line_num) if line_num is not None else str(idx)
 
         # Confidence for OCR rows
         ocr_conf = None

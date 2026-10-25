@@ -114,7 +114,8 @@ def compute_categorical_distribution(
     sensitive_keywords = [
         "pan", "aadhaar", "aadhar", "passport", "name", "phone", "mobile",
         "contact", "email", "address", "ssn", "voter", "patient", "customer",
-        "employee", "staff", "user", "dob", "birth", "identifier"
+        "employee", "staff", "user", "dob", "birth", "identifier",
+        "text_content", "message_text", "notes", "description"
     ]
     is_sensitive = (
         ai_sensitivity in ["SENSITIVE_PERSONAL_DATA", "PERSONAL_DATA"]
