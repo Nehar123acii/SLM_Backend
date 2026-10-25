@@ -56,12 +56,12 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: Personal data restricted to managed enterprise storage."
+  whats_right: "Owner reports no shared folders (not verified by Kavach)."
   whats_not: "Customer or patient data is accessible via unmanaged shared personal devices or personal drives."
   how_to_fix: "Migrate all customer spreadsheets to password-protected enterprise cloud storage with access logging."
   fix_action: "questionnaire"
   trigger:
-    fact: "personal_phones"
+    fact: "shared_folder"
     operator: "=="
     value: "yes"
 
@@ -72,7 +72,7 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: No unconsented processing of children's personal data identified."
+  whats_right: "Owner reports no unconsented processing of children's personal data (not verified by Kavach)."
   whats_not: "Records of individuals under 18 years of age processed without verifiable parental or guardian consent."
   how_to_fix: "Implement verifiable parental consent verification prior to processing personal data of children."
   fix_action: "review_columns"
@@ -104,14 +104,14 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: No unnotified collection touchpoints identified."
+  whats_right: "Owner reports a notice is shown (not verified by Kavach)."
   whats_not: "CCTV or intake collection points operate without visible, plain-language privacy notices."
   how_to_fix: "Place prominent signage near CCTV cameras and add collection notices on registration forms."
   fix_action: "questionnaire"
   trigger:
-    fact: "cctv"
+    fact: "collection_notice"
     operator: "=="
-    value: "yes"
+    value: "no"
 
 - id: "breach_contact_process"
   title: "No breach contact/process"
@@ -120,7 +120,7 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: Designated breach contact person and notification procedure established."
+  whats_right: "Owner reports a designated breach contact person and notification procedure are established (not verified by Kavach)."
   whats_not: "No designated contact person or incident process to intimate the Board and affected people without delay."
   how_to_fix: "Designate a privacy/breach officer, document notification workflows, and review the breach checklist."
   fix_action: "breach_checklist"
@@ -136,7 +136,7 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: Written data retention and scheduled disposal policy documented."
+  whats_right: "Owner reports a written data retention and scheduled disposal policy is documented (not verified by Kavach)."
   whats_not: "No written policy exists to periodically erase personal data once legal and business purposes expire."
   how_to_fix: "Adopt a data retention schedule and implement regular erasure cycles for expired records."
   fix_action: "erasure_plan"
@@ -152,7 +152,7 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: Staff prohibited from holding customer records on personal phones."
+  whats_right: "Owner reports staff are prohibited from holding customer records on personal phones (not verified by Kavach)."
   whats_not: "Staff, doctors, or contractors retain unencrypted customer files or chat backups on personal devices."
   how_to_fix: "Enforce a formal mobile device policy requiring enterprise accounts and prohibiting local storage on personal phones."
   fix_action: "questionnaire"
@@ -168,7 +168,7 @@
   verify: true
   verified: false
   source_url: ""
-  whats_right: "No issue found by Kavach's checks: Written Data Processing Agreements executed with all processors."
+  whats_right: "Owner reports written Data Processing Agreements are executed with all processors (not verified by Kavach)."
   whats_not: "Personal data shared with third-party labs, IT software, or contractors without binding written DPAs."
   how_to_fix: "Execute written Data Processing Agreements defining processing duties with every external vendor."
   fix_action: "questionnaire"

@@ -58,8 +58,8 @@ def test_empty_business_all_rules_not_assessed(db_session: Session):
 
 
 def test_missing_input_data_returns_not_assessed(db_session: Session):
-    """When only CCTV is answered, only notice_at_collection is assessed; other rules return NOT_ASSESSED."""
-    db_session.add(QuestionnaireAnswer(key="cctv", answer="no"))
+    """When only collection_notice is answered 'yes', notice_at_collection is GREEN; other rules return NOT_ASSESSED."""
+    db_session.add(QuestionnaireAnswer(key="collection_notice", answer="yes"))
     db_session.commit()
 
     results = {r.rule_id: r.state for r in evaluate_rules(db_session)}
@@ -151,25 +151,27 @@ def test_all_14_rules_have_concern_and_positive_evidence_fixtures(db_session: Se
     # ---------------------------------------------------------
     # 3: notice_at_collection
     # ---------------------------------------------------------
-    qa_cctv = QuestionnaireAnswer(key="cctv", answer="yes")
-    db_session.add(qa_cctv)
+    qa_cn = QuestionnaireAnswer(key="collection_notice", answer="no")
+    db_session.add(qa_cn)
     db_session.commit()
     assert {r.rule_id: r.state for r in evaluate_rules(db_session)}["notice_at_collection"] == "YELLOW"
 
-    qa_cctv.answer = "no"
+    qa_cn.answer = "yes"
     db_session.commit()
     assert {r.rule_id: r.state for r in evaluate_rules(db_session)}["notice_at_collection"] == "GREEN"
 
     # ---------------------------------------------------------
     # 4 & 5: unrestricted_shared_source and data_on_personal_phones
     # ---------------------------------------------------------
+    qa_sf = QuestionnaireAnswer(key="shared_folder", answer="yes")
     qa_pp = QuestionnaireAnswer(key="personal_phones", answer="yes")
-    db_session.add(qa_pp)
+    db_session.add_all([qa_sf, qa_pp])
     db_session.commit()
     res = {r.rule_id: r.state for r in evaluate_rules(db_session)}
     assert res["unrestricted_shared_source"] == "RED"
     assert res["data_on_personal_phones"] == "RED"
 
+    qa_sf.answer = "no"
     qa_pp.answer = "no"
     db_session.commit()
     res = {r.rule_id: r.state for r in evaluate_rules(db_session)}
@@ -302,15 +304,17 @@ def test_questionnaire_api_and_ledger_event(db_session: Session, app_client: Tes
     POST /api/questionnaire:
     - answers yes/no/not_sure
     - appends ledger event 'questionnaire_answer' with ids and enum only
-    - GET /api/questionnaire returns the 6 questions in plain business language
+    - GET /api/questionnaire returns the 8 questions in plain business language
     """
     # 1. GET questions
     get_res = app_client.get("/api/questionnaire")
     assert get_res.status_code == 200
     questions = get_res.json()
-    assert len(questions) == 6
+    assert len(questions) == 8
     assert any(q["key"] == "cctv" for q in questions)
     assert any(q["key"] == "breach_contact" for q in questions)
+    assert any(q["key"] == "shared_folder" for q in questions)
+    assert any(q["key"] == "collection_notice" for q in questions)
 
     # 2. POST answer
     post_res = app_client.post("/api/questionnaire", json={"key": "breach_contact", "answer": "yes"})
@@ -382,10 +386,114 @@ def test_flags_run_and_state_change_ledger_logging(db_session: Session, app_clie
         assert f["fix_action"] in ALLOWED_FIX_ACTIONS
 
 
+def test_cctv_no_alone_never_makes_notice_at_collection_green(db_session: Session):
+    """cctv answered 'no' alone never makes notice_at_collection GREEN (it remains NOT_ASSESSED)."""
+    db_session.add(QuestionnaireAnswer(key="cctv", answer="no"))
+    db_session.commit()
+
+    results = {r.rule_id: r.state for r in evaluate_rules(db_session)}
+    assert results["notice_at_collection"] == "NOT_ASSESSED"
+
+
+def test_shared_folder_and_personal_phones_are_independent(db_session: Session):
+    """shared_folder and personal_phones are independent: answering one does not change the other rule."""
+    qa_sf = QuestionnaireAnswer(key="shared_folder", answer="yes")
+    db_session.add(qa_sf)
+    db_session.commit()
+
+    res = {r.rule_id: r.state for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"] == "RED"
+    assert res["data_on_personal_phones"] == "NOT_ASSESSED"
+
+    qa_pp = QuestionnaireAnswer(key="personal_phones", answer="no")
+    db_session.add(qa_pp)
+    db_session.commit()
+
+    res = {r.rule_id: r.state for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"] == "RED"
+    assert res["data_on_personal_phones"] == "GREEN"
+
+    qa_sf.answer = "no"
+    db_session.commit()
+
+    res = {r.rule_id: r.state for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"] == "GREEN"
+    assert res["data_on_personal_phones"] == "GREEN"
+
+
+def test_shared_folder_and_collection_notice_states(db_session: Session):
+    """
+    Each new answer value gives the exact state:
+    - shared_folder yes -> RED; no -> GREEN with text 'Owner reports no shared folders (not verified by Kavach)'; not_sure / unanswered -> NOT_ASSESSED.
+    - collection_notice no -> YELLOW; yes -> GREEN with text 'Owner reports a notice is shown (not verified by Kavach)'; not_sure / unanswered -> NOT_ASSESSED.
+    """
+    # 1. Unanswered
+    res = {r.rule_id: r for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"].state == "NOT_ASSESSED"
+    assert res["notice_at_collection"].state == "NOT_ASSESSED"
+
+    # 2. not_sure
+    qa_sf = QuestionnaireAnswer(key="shared_folder", answer="not_sure")
+    qa_cn = QuestionnaireAnswer(key="collection_notice", answer="not_sure")
+    db_session.add_all([qa_sf, qa_cn])
+    db_session.commit()
+    res = {r.rule_id: r for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"].state == "NOT_ASSESSED"
+    assert res["notice_at_collection"].state == "NOT_ASSESSED"
+
+    # 3. shared_folder yes -> RED; collection_notice no -> YELLOW
+    qa_sf.answer = "yes"
+    qa_cn.answer = "no"
+    db_session.commit()
+    res = {r.rule_id: r for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"].state == "RED"
+    assert res["notice_at_collection"].state == "YELLOW"
+
+    # 4. shared_folder no -> GREEN; collection_notice yes -> GREEN
+    qa_sf.answer = "no"
+    qa_cn.answer = "yes"
+    db_session.commit()
+    res = {r.rule_id: r for r in evaluate_rules(db_session)}
+    assert res["unrestricted_shared_source"].state == "GREEN"
+    assert any("Owner reports no shared folders (not verified by Kavach)" in ev for ev in res["unrestricted_shared_source"].evidence_refs)
+    assert res["notice_at_collection"].state == "GREEN"
+    assert any("Owner reports a notice is shown (not verified by Kavach)" in ev for ev in res["notice_at_collection"].evidence_refs)
+
+
+def test_questionnaire_green_text_contains_owner_reports():
+    """Every questionnaire-based GREEN text contains 'Owner reports'."""
+    questionnaire_rule_ids = {
+        "unrestricted_shared_source",
+        "notice_at_collection",
+        "breach_contact_process",
+        "retention_policy",
+        "data_on_personal_phones",
+        "vendors_unwritten_agreement",
+        "minors_parental_consent",
+        "no_named_contact",
+    }
+    all_rules = {r["id"]: r for r in load_rules()}
+    for rid in questionnaire_rule_ids:
+        r = all_rules[rid]
+        whats_right = r.get("whats_right", "")
+        assert "Owner reports" in whats_right, f"Rule {rid} whats_right lacks 'Owner reports': {whats_right}"
+
+
 def test_rules_yaml_metadata_and_wording_compliance():
     """Verify all rules maintain verify: true, verified: false, allowed fix_actions, and never use 'Compliant'."""
     all_rules = load_rules()
     assert len(all_rules) >= 12
+
+    questionnaire_rule_ids = {
+        "unrestricted_shared_source",
+        "notice_at_collection",
+        "breach_contact_process",
+        "retention_policy",
+        "data_on_personal_phones",
+        "vendors_unwritten_agreement",
+        "minors_parental_consent",
+        "no_named_contact",
+    }
 
     for r in all_rules:
         assert r.get("verify") is True, f"Rule {r['id']} missing verify: true"
@@ -395,4 +503,8 @@ def test_rules_yaml_metadata_and_wording_compliance():
         whats_right = r.get("whats_right", "")
         assert len(whats_right) > 0, f"Rule {r['id']} missing whats_right"
         assert "Compliant" not in whats_right, f"Forbidden word 'Compliant' found in whats_right for {r['id']}"
-        assert "No issue found by Kavach's checks" in whats_right, f"Required phrase missing in whats_right for {r['id']}"
+
+        if r["id"] in questionnaire_rule_ids:
+            assert "Owner reports" in whats_right, f"Questionnaire rule {r['id']} missing 'Owner reports' in whats_right"
+        else:
+            assert "No issue found by Kavach's checks" in whats_right, f"Data rule {r['id']} missing 'No issue found by Kavach's checks' in whats_right"

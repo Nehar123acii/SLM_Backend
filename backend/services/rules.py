@@ -49,6 +49,8 @@ QUESTIONNAIRE_KEYS = {
     "breach_contact",
     "retention_policy",
     "children_served",
+    "shared_folder",
+    "collection_notice",
 }
 
 QUESTIONNAIRE_QUESTIONS = [
@@ -88,6 +90,18 @@ QUESTIONNAIRE_QUESTIONS = [
         "question": "Do you knowingly serve or retain data of children under 18 requiring verifiable parental consent? (s.9).",
         "options": ["yes", "no", "not_sure"],
     },
+    {
+        "key": "shared_folder",
+        "title": "Customer files in shared or open folder",
+        "question": "Do you keep customer or patient files in a shared or open folder, such as a shared drive or a group chat anyone can open?",
+        "options": ["yes", "no", "not_sure"],
+    },
+    {
+        "key": "collection_notice",
+        "title": "Notice at collection touchpoints",
+        "question": "Do you tell people why you collect their details, for example a sign at the desk or a line on your registration form?",
+        "options": ["yes", "no", "not_sure"],
+    },
 ]
 
 # Additional rules defined directly for compliance engine
@@ -118,7 +132,7 @@ ADDITIONAL_RULES: List[Dict[str, Any]] = [
         "verify": True,
         "verified": False,
         "source_url": "",
-        "whats_right": "No issue found by Kavach's checks: Designated breach notification officer established.",
+        "whats_right": "Owner reports designated breach notification officer established (not verified by Kavach).",
         "whats_not": "Organization has not appointed a named contact person responsible for breach intimation.",
         "how_to_fix": "Designate a named contact person and implement the breach response checklist.",
         "fix_action": "breach_checklist",
@@ -269,6 +283,8 @@ def collect_facts(db: Session) -> Dict[str, Any]:
         "breach_contact": qa_map.get("breach_contact"),
         "retention_policy": qa_map.get("retention_policy"),
         "children_served": qa_map.get("children_served"),
+        "shared_folder": qa_map.get("shared_folder"),
+        "collection_notice": qa_map.get("collection_notice"),
         # Entities & Counts
         "total_datasets": len(datasets),
         "total_columns": len(columns),
@@ -324,7 +340,7 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
     if bc is None or bc == "unanswered":
         results.append(RuleResult("no_named_contact", "NOT_ASSESSED", []))
     elif bc == "yes":
-        results.append(RuleResult("no_named_contact", "GREEN", ["questionnaire:breach_contact=yes"]))
+        results.append(RuleResult("no_named_contact", "GREEN", ["questionnaire:breach_contact=yes", "Owner reports designated breach notification officer established (not verified by Kavach)"]))
     elif bc == "no":
         results.append(RuleResult("no_named_contact", "RED", ["questionnaire:breach_contact=no"]))
     else:  # not_sure
@@ -334,39 +350,36 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
     if bc is None or bc == "unanswered":
         results.append(RuleResult("breach_contact_process", "NOT_ASSESSED", []))
     elif bc == "yes":
-        results.append(RuleResult("breach_contact_process", "GREEN", ["questionnaire:breach_contact=yes"]))
+        results.append(RuleResult("breach_contact_process", "GREEN", ["questionnaire:breach_contact=yes", "Owner reports a designated breach contact person and notification procedure are established (not verified by Kavach)"]))
     elif bc == "no":
         results.append(RuleResult("breach_contact_process", "RED", ["questionnaire:breach_contact=no"]))
     else:
         results.append(RuleResult("breach_contact_process", "YELLOW", ["questionnaire:breach_contact=not_sure"]))
 
     # 4. notice_at_collection
-    cctv = facts["cctv"]
-    if cctv is None or cctv == "unanswered":
-        results.append(RuleResult("notice_at_collection", "NOT_ASSESSED", []))
-    elif cctv == "no":
-        results.append(RuleResult("notice_at_collection", "GREEN", ["questionnaire:cctv=no"]))
-    elif cctv == "yes":
-        results.append(RuleResult("notice_at_collection", "YELLOW", ["questionnaire:cctv=yes"]))
+    cn = facts.get("collection_notice")
+    if cn == "no":
+        results.append(RuleResult("notice_at_collection", "YELLOW", ["questionnaire:collection_notice=no"]))
+    elif cn == "yes":
+        results.append(RuleResult("notice_at_collection", "GREEN", ["questionnaire:collection_notice=yes", "Owner reports a notice is shown (not verified by Kavach)"]))
     else:
-        results.append(RuleResult("notice_at_collection", "YELLOW", ["questionnaire:cctv=not_sure"]))
+        results.append(RuleResult("notice_at_collection", "NOT_ASSESSED", []))
 
     # 5. unrestricted_shared_source
-    pp = facts["personal_phones"]
-    if pp is None or pp == "unanswered":
-        results.append(RuleResult("unrestricted_shared_source", "NOT_ASSESSED", []))
-    elif pp == "no":
-        results.append(RuleResult("unrestricted_shared_source", "GREEN", ["questionnaire:personal_phones=no"]))
-    elif pp == "yes":
-        results.append(RuleResult("unrestricted_shared_source", "RED", ["questionnaire:personal_phones=yes"]))
+    sf = facts.get("shared_folder")
+    if sf == "yes":
+        results.append(RuleResult("unrestricted_shared_source", "RED", ["questionnaire:shared_folder=yes"]))
+    elif sf == "no":
+        results.append(RuleResult("unrestricted_shared_source", "GREEN", ["questionnaire:shared_folder=no", "Owner reports no shared folders (not verified by Kavach)"]))
     else:
-        results.append(RuleResult("unrestricted_shared_source", "YELLOW", ["questionnaire:personal_phones=not_sure"]))
+        results.append(RuleResult("unrestricted_shared_source", "NOT_ASSESSED", []))
 
-    # 6. data_on_personal_phones (synced with personal_phones)
+    # 6. data_on_personal_phones (driven by personal_phones, independent of shared_folder)
+    pp = facts.get("personal_phones")
     if pp is None or pp == "unanswered":
         results.append(RuleResult("data_on_personal_phones", "NOT_ASSESSED", []))
     elif pp == "no":
-        results.append(RuleResult("data_on_personal_phones", "GREEN", ["questionnaire:personal_phones=no"]))
+        results.append(RuleResult("data_on_personal_phones", "GREEN", ["questionnaire:personal_phones=no", "Owner reports staff are prohibited from holding customer records on personal phones (not verified by Kavach)"]))
     elif pp == "yes":
         results.append(RuleResult("data_on_personal_phones", "RED", ["questionnaire:personal_phones=yes"]))
     else:
@@ -377,7 +390,7 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
     if vendors is None or vendors == "unanswered":
         results.append(RuleResult("vendors_unwritten_agreement", "NOT_ASSESSED", []))
     elif vendors == "no":
-        results.append(RuleResult("vendors_unwritten_agreement", "GREEN", ["questionnaire:vendors=no"]))
+        results.append(RuleResult("vendors_unwritten_agreement", "GREEN", ["questionnaire:vendors=no", "Owner reports written Data Processing Agreements are executed with all processors (not verified by Kavach)"]))
     elif vendors == "yes":
         results.append(RuleResult("vendors_unwritten_agreement", "RED", ["questionnaire:vendors=yes"]))
     else:
@@ -388,7 +401,7 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
     if ret is None or ret == "unanswered":
         results.append(RuleResult("retention_policy", "NOT_ASSESSED", []))
     elif ret == "yes":
-        results.append(RuleResult("retention_policy", "GREEN", ["questionnaire:retention_policy=yes"]))
+        results.append(RuleResult("retention_policy", "GREEN", ["questionnaire:retention_policy=yes", "Owner reports a written data retention and scheduled disposal policy is documented (not verified by Kavach)"]))
     elif ret == "no":
         results.append(RuleResult("retention_policy", "YELLOW", ["questionnaire:retention_policy=no"]))
     else:
@@ -402,7 +415,7 @@ def evaluate_rules(db: Session) -> List[RuleResult]:
     elif children == "yes":
         results.append(RuleResult("minors_parental_consent", "RED", ["questionnaire:children_served=yes"]))
     elif children == "no":
-        results.append(RuleResult("minors_parental_consent", "GREEN", ["questionnaire:children_served=no"]))
+        results.append(RuleResult("minors_parental_consent", "GREEN", ["questionnaire:children_served=no", "Owner reports no unconsented processing of children's personal data (not verified by Kavach)"]))
     elif children == "not_sure":
         results.append(RuleResult("minors_parental_consent", "YELLOW", ["questionnaire:children_served=not_sure"]))
     else:
