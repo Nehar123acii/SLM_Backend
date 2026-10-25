@@ -23,6 +23,7 @@ from .models import (
     LedgerTamperBackup,
     ErasurePlan,
     NoticeSent,
+    RightsCase,
 )
 
 __all__ = [
@@ -53,4 +54,5 @@ __all__ = [
     "LedgerTamperBackup",
     "ErasurePlan",
     "NoticeSent",
+    "RightsCase",
 ]

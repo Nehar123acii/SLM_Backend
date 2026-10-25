@@ -437,3 +437,35 @@ class NoticeSent(Base):
     notice_type = SAColumn(String(32), nullable=False)  # individual | board_intimation | board_detailed
 
 
+class RightsCase(Base):
+    """
+    Data principal rights request case lifecycle.
+    Tracks state machine: received -> identity_check -> plan -> approved -> executed -> closed.
+    Never stores raw personal data or unmasked message text.
+    """
+    __tablename__ = "cases"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    case_ref = SAColumn(String(64), unique=True, nullable=False, index=True)
+    person_id = SAColumn(Integer, ForeignKey("people.id"), nullable=True, index=True)
+    sender_masked = SAColumn(String(128), nullable=False)
+    intent = SAColumn(String(64), nullable=False)  # erase | access | correct | withdraw_consent | complaint
+    intent_source = SAColumn(String(32), default="rule", nullable=False)  # rule | inferred | owner_confirmed
+    confidence = SAColumn(Float, default=1.0, nullable=False)
+    resolution = SAColumn(String(32), default="none", nullable=False)  # strong | probable | ambiguous | none
+    identity_confirmed = SAColumn(Boolean, default=False, nullable=False)
+    status = SAColumn(String(32), default="received", nullable=False)  # received | identity_check | plan | approved | executed | closed
+    plan_id = SAColumn(String(64), ForeignKey("erasure_plans.id"), nullable=True)
+    plan_hash = SAColumn(String(64), nullable=True)
+    received_at = SAColumn(DateTime, default=utc_now, nullable=False)
+    due_at = SAColumn(DateTime, nullable=False)
+    due_verify = SAColumn(Boolean, default=True, nullable=False)
+    message_excerpt_masked = SAColumn(String(255), nullable=True)
+    checklist_json = SAColumn(Text, nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+    updated_at = SAColumn(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    person = relationship("Person")
+    plan = relationship("ErasurePlan")
+
+

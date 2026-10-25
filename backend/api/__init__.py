@@ -7,6 +7,7 @@ from .evidence import router as evidence_router
 from .rules import router as flags_router
 from .erasure import erasure_router
 from .breach import router as breach_router
+from .rights import rights_router, cases_router
 
 __all__ = [
     "inventory_router",
@@ -18,4 +19,6 @@ __all__ = [
     "flags_router",
     "erasure_router",
     "breach_router",
+    "rights_router",
+    "cases_router",
 ]
