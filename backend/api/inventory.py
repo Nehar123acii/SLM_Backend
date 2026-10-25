@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.api.deps import get_db
 from backend.db.models import Dataset, Column, ETLIssue, IdentifierFinding, VersionDiff
 from backend.services.inventory import InventoryService
+from backend.services.purge import touch_activity
 from backend.etl.adapters import SUPPORTED_SOURCES
 from backend.etl.ocr_engine import OCRError
 from backend.schemas import (
@@ -70,6 +71,7 @@ async def upload_dataset(
             sheet_name=sheet_name,
             language=language,
         )
+        touch_activity(db)
         return result
     except (ValueError, OCRError) as ve:
         raise HTTPException(status_code=400, detail=str(ve))

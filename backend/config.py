@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     response_days: int = 30
     breach_stage_2_hours: int = 72
 
+    # Operational Retention & Purge settings (Kavach-configurable, not statutory)
+    kavach_retention_days: int = 15
+    kavach_dev: int = 0
+
     def model_post_init(self, __context: object) -> None:
         if "KAVACH_DATA_DIR" in os.environ:
             self.kavach_data_dir = os.environ["KAVACH_DATA_DIR"]
@@ -71,3 +75,14 @@ RESPONSE_DAYS: int = 30
 # The first Board intimation is "without delay": no number
 BREACH_STAGE_1_DESCRIPTION: str = "without delay"
 BREACH_STAGE_2_HOURS: int = 72
+
+# Kavach operational retention setting (not statutory / not legal mandate)
+KAVACH_RETENTION_DAYS: int = int(os.environ.get("KAVACH_RETENTION_DAYS", "15"))
+
+
+def is_kavach_dev() -> bool:
+    """Returns True if developer mode is enabled via KAVACH_DEV env or setting."""
+    val = os.environ.get("KAVACH_DEV", "")
+    if val.lower() in ("1", "true", "yes", "on"):
+        return True
+    return bool(getattr(settings, "kavach_dev", 0))

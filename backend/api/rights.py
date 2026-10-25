@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.db.models import RightsCase
+from backend.services.purge import touch_activity
 from backend.services.rights import (
     approve_case,
     classify_message,
@@ -81,6 +82,7 @@ def intake_rights_requests(
 
     try:
         created_cases = process_intake(session=db, messages=messages)
+        touch_activity(db)
         return created_cases
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Intake processing failed: {str(e)}")
@@ -141,6 +143,7 @@ def confirm_identity_endpoint(
     """
     try:
         case = confirm_identity_for_case(db, case_id)
+        touch_activity(db)
         return serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -160,6 +163,7 @@ def create_plan_endpoint(
     """
     try:
         case = create_plan_for_case(db, case_id)
+        touch_activity(db)
         return serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -180,6 +184,7 @@ def approve_case_endpoint(
     """
     try:
         case = approve_case(db, case_id, payload.confirm_hash)
+        touch_activity(db)
         return serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -200,6 +205,7 @@ def execute_case_endpoint(
     """
     try:
         case = execute_case(db, case_id)
+        touch_activity(db)
         return serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -219,6 +225,7 @@ def close_case_endpoint(
     """
     try:
         case = close_case(db, case_id)
+        touch_activity(db)
         return serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

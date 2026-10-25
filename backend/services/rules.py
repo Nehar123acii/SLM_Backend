@@ -535,6 +535,9 @@ def save_questionnaire_answer(db: Session, key: str, answer: str) -> None:
     )
     db.commit()
 
+    from backend.services.purge import touch_activity
+    touch_activity(db)
+
 
 # ---------------------------------------------------------------------------
 # Flags Evaluation Snapshot & Retrieval

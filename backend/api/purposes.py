@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.db.models import Dataset
+from backend.services.purge import touch_activity
 from backend.services.purposes import (
     VALID_SEGMENTS,
     generate_questions,
@@ -51,7 +52,7 @@ def submit_answer(payload: AnswerSubmissionRequest, db: Session = Depends(get_db
     Append-only: creates confirmed or unknown purpose links and supersedes prior active links.
     Rejects unknown purpose IDs with HTTP 400.
     """
-    return record_answer(
+    res = record_answer(
         db=db,
         column_id=payload.column_id,
         segment=payload.segment,
@@ -59,6 +60,8 @@ def submit_answer(payload: AnswerSubmissionRequest, db: Session = Depends(get_db
         unknown=bool(payload.unknown),
         answered_by=payload.answered_by or "business_owner",
     )
+    touch_activity(db)
+    return res
 
 
 @router.get("/columns/{column_id}/purposes")

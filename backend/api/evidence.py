@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.api.deps import get_db
 from backend.db.models import EvidencePack
 from backend.services.evidence import export_evidence_pack, verify_evidence_pack
+from backend.services.purge import touch_activity
 
 router = APIRouter(tags=["evidence"])
 
@@ -14,7 +15,9 @@ router = APIRouter(tags=["evidence"])
 @router.post("/api/evidence/export")
 def create_evidence_pack(db: Session = Depends(get_db)):
     """Exports a tamper-evident compliance audit package and registers its head hash."""
-    return export_evidence_pack(db)
+    pack = export_evidence_pack(db)
+    touch_activity(db)
+    return pack
 
 
 @router.get("/api/evidence/download/{pack_id}")

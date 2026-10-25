@@ -10,6 +10,7 @@ from .breach import router as breach_router
 from .rights import rights_router, cases_router
 from .graphs import router as graphs_router
 from .reports import router as reports_router
+from .business import business_router
 
 __all__ = [
     "inventory_router",
@@ -25,4 +26,5 @@ __all__ = [
     "cases_router",
     "graphs_router",
     "reports_router",
+    "business_router",
 ]

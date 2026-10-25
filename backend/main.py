@@ -21,6 +21,7 @@ from backend.api import (
     cases_router,
     graphs_router,
     reports_router,
+    business_router,
 )
 
 logging.basicConfig(
@@ -32,8 +33,20 @@ logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure upload temp directory and database tables exist
+    # Startup: ensure upload temp directory exists
     os.makedirs(settings.upload_temp_dir, exist_ok=True)
+    # Retention check at app startup: if retention period expired, purge business data
+    try:
+        from backend.db.engine import SessionLocal
+        from backend.services.purge import check_and_purge_if_expired
+        session = SessionLocal()
+        try:
+            check_and_purge_if_expired(session)
+        finally:
+            session.close()
+    except Exception as e:
+        logger.debug("Startup retention check note: %s", e)
+
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables initialized. Upload directory verified at %s.", settings.upload_temp_dir)
     yield
@@ -65,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(purposes_router)
     app.include_router(purposes_router, prefix="/api/v1")
     app.include_router(ledger_router)
+    app.include_router(business_router)
     app.include_router(evidence_router)
     app.include_router(flags_router)
     app.include_router(erasure_router, prefix="/api/erasure", tags=["erasure"])

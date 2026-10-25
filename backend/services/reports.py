@@ -34,6 +34,8 @@ DEFAULT_LIMITATIONS = """# Kavach Compliance Evidence Pack — Limitations & Sco
 3. **Out of Scope**: Off-site backups, secondary cold storage, and third-party data processor copies are out of scope of this local evidence snapshot.
 4. **Statutory Citations**: Statutory citations in rules and retention schedules are unverified hints provided for human review and verification.
 5. **Regulatory Disclaimer**: This platform and evidence pack serve as an operational readiness aid and technical compliance audit trail, not formal legal advice.
+6. **Deletion vs. Forensic Wiping**: Data purging is standard filesystem deletion, not DoD-grade forensic wiping or cryptographic zeroization of physical disk sectors.
+7. **Backups Out of Scope**: Business-level purge removes local SQLite storage and workspace output files; secondary backups, external cold storage, and snapshots are out of scope.
 """
 
 
