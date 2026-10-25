@@ -51,6 +51,8 @@ credentials/
 *.db
 *.sqlite
 *.sqlite3
+data/
+
 
 # ─── AI / model weights ──────────────────────────────────────────────────────
 

@@ -217,6 +217,7 @@ class InventoryService:
                 metadata_json=json.dumps(source_meta),
             )
             db.add(dataset_obj)
+            db.flush()
 
             # Save columns with source lineage
             for col_name, inferred_type in col_types.items():

@@ -96,6 +96,7 @@ def compute_categorical_distribution(
     series: pd.Series,
     ai_sensitivity: Optional[str] = None,
     ai_category: Optional[str] = None,
+    inferred_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Computes distinct count, top 10 frequencies, high cardinality flag.
@@ -110,10 +111,17 @@ def compute_categorical_distribution(
     val_counts = non_null.value_counts()
     distinct_count = len(val_counts)
 
+    sensitive_keywords = [
+        "pan", "aadhaar", "aadhar", "passport", "name", "phone", "mobile",
+        "contact", "email", "address", "ssn", "voter", "patient", "customer",
+        "employee", "staff", "user", "dob", "birth", "identifier"
+    ]
     is_sensitive = (
         ai_sensitivity in ["SENSITIVE_PERSONAL_DATA", "PERSONAL_DATA"]
-        and ai_category in ["GOVERNMENT_ID", "BIOMETRIC", "HEALTH", "IDENTITY"]
-    ) or any(k in col_name.lower() for k in ["pan", "aadhaar", "passport", "patient_name", "customer_name"])
+        or ai_category in ["GOVERNMENT_ID", "BIOMETRIC", "HEALTH", "IDENTITY", "CONTACT", "FINANCIAL", "IDENTIFIER"]
+        or (inferred_type in ["EMAIL", "PHONE"])
+        or any(k in col_name.lower() for k in sensitive_keywords)
+    )
 
     top_categories = []
     for val, cnt in val_counts.head(10).items():
@@ -263,6 +271,7 @@ def compute_complete_eda(
                 series=df[col],
                 ai_sensitivity=cmeta.get("ai_sensitivity"),
                 ai_category=cmeta.get("ai_category"),
+                inferred_type=itype,
             )
             categorical_distributions[col] = cat_dist
 

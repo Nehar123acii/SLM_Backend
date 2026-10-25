@@ -1,4 +1,4 @@
-from .engine import engine, SessionLocal, get_db
+from .engine import engine, SessionLocal, get_db, dispose_engine
 from .models import (
     Base,
     Dataset,
@@ -10,12 +10,20 @@ from .models import (
     CrossSourceMatch,
     PrivacyRequest,
     Incident,
+    Person,
+    Occurrence,
+    Purpose,
+    PurposeLink,
+    FlagResult,
+    LedgerEvent,
+    BusinessState,
 )
 
 __all__ = [
     "engine",
     "SessionLocal",
     "get_db",
+    "dispose_engine",
     "Base",
     "Dataset",
     "Column",
@@ -26,4 +34,11 @@ __all__ = [
     "CrossSourceMatch",
     "PrivacyRequest",
     "Incident",
+    "Person",
+    "Occurrence",
+    "Purpose",
+    "PurposeLink",
+    "FlagResult",
+    "LedgerEvent",
+    "BusinessState",
 ]

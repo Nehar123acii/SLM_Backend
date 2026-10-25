@@ -65,6 +65,9 @@ class Column(Base):
     identifier_flags = SAColumn(Text, nullable=True)  # JSON array string
     purpose = SAColumn(String(255), nullable=True)  # Documented business purpose
     purpose_status = SAColumn(String(32), default="AWAITING_REVIEW", nullable=False)  # DOCUMENTED / AWAITING_REVIEW
+    locator = SAColumn(String(255), nullable=True)
+    category = SAColumn(String(64), nullable=True)
+    impact_tier = SAColumn(String(32), nullable=True)
 
     dataset = relationship("Dataset", back_populates="columns")
 
@@ -207,3 +210,116 @@ class Incident(Base):
     evidence_refs = SAColumn(Text, nullable=False)  # JSON array string
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
     updated_at = SAColumn(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Part C: Additive Models (Identity, Occurrences, Governance, Ledger)
+# ---------------------------------------------------------------------------
+
+class Person(Base):
+    """
+    Resolved or unresolved individual identity entity.
+    """
+    __tablename__ = "people"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    resolution = SAColumn(String(64), nullable=False, default="UNRESOLVED")
+    confidence = SAColumn(Float, nullable=False, default=1.0)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+    occurrences = relationship("Occurrence", back_populates="person")
+
+
+class Occurrence(Base):
+    """
+    Instance of an identifier occurrence in a source dataset or document.
+    Stores only format-preserving masked sample and HMAC hash — never raw values.
+    """
+    __tablename__ = "occurrences"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    person_id = SAColumn(Integer, ForeignKey("people.id"), nullable=True, index=True)
+    column_id = SAColumn(Integer, ForeignKey("columns.id"), nullable=True, index=True)
+    row_ref = SAColumn(String(128), nullable=True)
+    masked_sample = SAColumn(String(255), nullable=True)
+    value_hmac = SAColumn(String(64), nullable=False, index=True)
+    origin = SAColumn(String(32), nullable=False, default="rule")  # rule | slm | ocr
+    ocr_conf = SAColumn(Float, nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+    person = relationship("Person", back_populates="occurrences")
+    column = relationship("Column")
+
+
+class Purpose(Base):
+    """
+    Catalog of permitted business processing purposes under DPDP.
+    """
+    __tablename__ = "purposes"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    label_key = SAColumn(String(128), nullable=False, unique=True, index=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+    purpose_links = relationship("PurposeLink", back_populates="purpose")
+
+
+class PurposeLink(Base):
+    """
+    Linkage between a dataset column, data principal segment, and business purpose.
+    """
+    __tablename__ = "purpose_links"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    column_id = SAColumn(Integer, ForeignKey("columns.id"), nullable=False, index=True)
+    segment = SAColumn(String(32), nullable=False)  # patient | customer | staff
+    purpose_id = SAColumn(Integer, ForeignKey("purposes.id"), nullable=False, index=True)
+    status = SAColumn(String(32), nullable=False, default="inferred")  # confirmed | inferred | unknown
+    answered_by = SAColumn(String(128), nullable=True)
+    answered_at = SAColumn(DateTime, nullable=True)
+    superseded_by = SAColumn(Integer, ForeignKey("purpose_links.id"), nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+    purpose = relationship("Purpose", back_populates="purpose_links")
+    column = relationship("Column")
+
+
+class FlagResult(Base):
+    """
+    Evaluation output of a compliance check or rule.
+    """
+    __tablename__ = "flag_results"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    run_id = SAColumn(String(64), nullable=False, index=True)
+    rule_id = SAColumn(String(64), nullable=False, index=True)
+    state = SAColumn(String(32), nullable=False)  # GREEN | YELLOW | RED | NOT_ASSESSED
+    evidence_refs = SAColumn(Text, nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+
+class LedgerEvent(Base):
+    """
+    Tamper-evident append-only ledger entry chaining sequential operations.
+    """
+    __tablename__ = "ledger_events"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    seq = SAColumn(Integer, nullable=False, unique=True, index=True)
+    event_type = SAColumn(String(64), nullable=False)
+    payload_json = SAColumn(Text, nullable=False)
+    prev_hash = SAColumn(String(64), nullable=False)
+    hash = SAColumn(String(64), nullable=False)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+
+class BusinessState(Base):
+    """
+    Tracks overall business data activity and heartbeat timestamp.
+    """
+    __tablename__ = "business_state"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    last_activity = SAColumn(DateTime, nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+

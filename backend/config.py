@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 from pydantic import field_validator
@@ -5,7 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "sqlite:///./privacy_assistant.db"
+    kavach_data_dir: str = "data"
+    database_url: str = ""
     upload_temp_dir: str = "./uploads_temp"
     max_upload_rows: int = 50_000
     max_upload_columns: int = 200
@@ -22,6 +25,21 @@ class Settings(BaseSettings):
     ocr_timeout_seconds: float = 30.0
     ocr_min_native_text_chars: int = 50
     ocr_min_native_words: int = 5
+
+    def model_post_init(self, __context: object) -> None:
+        if "KAVACH_DATA_DIR" in os.environ:
+            self.kavach_data_dir = os.environ["KAVACH_DATA_DIR"]
+        os.makedirs(self.kavach_data_dir, exist_ok=True)
+        if not self.database_url:
+            db_file = (Path(self.kavach_data_dir) / "kavach.db").as_posix()
+            self.database_url = f"sqlite:///{db_file}"
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_sqlite_only(cls, value: str) -> str:
+        if value and not value.startswith("sqlite"):
+            raise ValueError(f"SQLite is the only allowed database. Provided: {value}")
+        return value
 
     @field_validator("ai_live_url")
     @classmethod
