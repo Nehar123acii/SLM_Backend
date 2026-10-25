@@ -98,6 +98,18 @@ Statistical findings only — no raw personal data values recorded.
   - V2 excludes 2 customers from V1 — tests REMOVED detection in version reconciler
 - **Version diff (v1→v2):** unchanged=5, changed=3, added=7, removed=2
 
+## multisheet_clinic.xlsx
+
+- **Source:** —
+- **Rows:** 5
+- **Columns:** 5
+
+## customers_nested.json
+
+- **Source:** —
+- **Rows:** 3
+- **Columns:** 7
+
 ## whatsapp_chat.txt
 
 - **file:** whatsapp_chat.txt

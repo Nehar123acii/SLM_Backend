@@ -27,6 +27,8 @@ class Dataset(Base):
     id = SAColumn(Integer, primary_key=True, autoincrement=True)
     dataset_id = SAColumn(String(64), unique=True, index=True, nullable=False)
     original_filename = SAColumn(String(255), nullable=False)
+    source_type = SAColumn(String(32), default="csv", nullable=False)  # csv / excel / google_forms / whatsapp / json
+    sheet_name = SAColumn(String(128), nullable=True)
     version = SAColumn(Integer, default=1, nullable=False)
     row_count = SAColumn(Integer, default=0, nullable=False)
     accepted_count = SAColumn(Integer, default=0, nullable=False)
@@ -35,6 +37,8 @@ class Dataset(Base):
     upload_timestamp = SAColumn(DateTime, default=utc_now, nullable=False)
     status = SAColumn(String(32), default="PENDING", nullable=False)  # PENDING / ETL_COMPLETE / AI_CLASSIFIED / APPROVED / REJECTED
     temp_file_path = SAColumn(String(512), nullable=True)
+    eda_summary = SAColumn(Text, nullable=True)  # JSON string of 5-category EDA report
+    metadata_json = SAColumn(Text, nullable=True)  # JSON string of source-specific metadata
 
     columns = relationship("Column", back_populates="dataset", cascade="all, delete-orphan")
     etl_issues = relationship("ETLIssue", back_populates="dataset", cascade="all, delete-orphan")
@@ -51,6 +55,7 @@ class Column(Base):
     id = SAColumn(Integer, primary_key=True, autoincrement=True)
     dataset_id = SAColumn(String(64), ForeignKey("datasets.dataset_id"), nullable=False, index=True)
     column_name = SAColumn(String(255), nullable=False)
+    original_name = SAColumn(String(255), nullable=True)  # Un-normalized source name
     inferred_type = SAColumn(String(32), nullable=False)
     ai_category = SAColumn(String(64), nullable=True)
     ai_sensitivity = SAColumn(String(64), nullable=True)
@@ -58,6 +63,8 @@ class Column(Base):
     ai_explanation = SAColumn(String(512), nullable=True)
     dpdp_basis = SAColumn(String(255), nullable=True)
     identifier_flags = SAColumn(Text, nullable=True)  # JSON array string
+    purpose = SAColumn(String(255), nullable=True)  # Documented business purpose
+    purpose_status = SAColumn(String(32), default="AWAITING_REVIEW", nullable=False)  # DOCUMENTED / AWAITING_REVIEW
 
     dataset = relationship("Dataset", back_populates="columns")
 
@@ -112,6 +119,39 @@ class VersionDiff(Base):
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
 
     dataset = relationship("Dataset", foreign_keys=[dataset_id], back_populates="version_diffs")
+
+
+class AuditLog(Base):
+    """
+    Audit log table for sensitive system events.
+    Never stores raw personal data in event details.
+    """
+    __tablename__ = "audit_logs"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    timestamp = SAColumn(DateTime, default=utc_now, nullable=False)
+    action = SAColumn(String(64), nullable=False)
+    entity_type = SAColumn(String(64), nullable=False)
+    entity_id = SAColumn(String(64), nullable=False)
+    actor = SAColumn(String(128), default="system", nullable=False)
+    details = SAColumn(Text, nullable=True)  # JSON string without PII
+
+
+class CrossSourceMatch(Base):
+    """
+    Potential or confirmed data principal identity link across different data sources.
+    Kept UNRESOLVED by default; never automatically equates individuals on names alone.
+    """
+    __tablename__ = "cross_source_matches"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    source_dataset_id_1 = SAColumn(String(64), ForeignKey("datasets.dataset_id"), nullable=False, index=True)
+    source_dataset_id_2 = SAColumn(String(64), ForeignKey("datasets.dataset_id"), nullable=False, index=True)
+    match_field = SAColumn(String(128), nullable=False)
+    match_type = SAColumn(String(64), default="POTENTIAL_CANDIDATE", nullable=False)  # POTENTIAL_CANDIDATE / EXACT_IDENTIFIER
+    status = SAColumn(String(32), default="UNRESOLVED", nullable=False)  # UNRESOLVED / CONFIRMED / DISMISSED
+    caveat = SAColumn(String(512), nullable=False)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
 
 
 class PrivacyRequest(Base):

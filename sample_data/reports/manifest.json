@@ -187,6 +187,22 @@
         "City column has regional spelling variants (Mumbai/Bombay, Bengaluru/Bangalore)",
         "V2 excludes 2 customers from V1 \u2014 tests REMOVED detection in version reconciler"
       ]
+    },
+    {
+      "file": "multisheet_clinic.xlsx",
+      "sheets": [
+        "Patients_Directory",
+        "Doctors_Roster"
+      ],
+      "row_count": 5,
+      "column_count": 5,
+      "purpose": "Multi-sheet Excel workbook testing"
+    },
+    {
+      "file": "customers_nested.json",
+      "row_count": 3,
+      "column_count": 7,
+      "purpose": "Nested JSON document testing"
     }
   ]
 }

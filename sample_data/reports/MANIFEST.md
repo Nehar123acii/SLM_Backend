@@ -26,6 +26,8 @@
 | appointments_messy.csv | appointments_form.csv | 64 | 5 | exact_duplicates, plausible_duplicates, messy_phones |
 | customers_messy_v1.csv | synthetic_customers.csv | 38 | 8 | see v1 issues |
 | customers_messy_v2.csv | synthetic_customers_v2.csv | 15 | 8 | version diff fixture |
+| multisheet_clinic.xlsx | — | 5 | 5 |  |
+| customers_nested.json | — | 3 | 7 |  |
 
 ## Expected-clean reference fixtures
 

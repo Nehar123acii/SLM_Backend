@@ -1,0 +1,63 @@
+[
+  {
+    "customer_id": "JSON-001",
+    "full_name": "Manish Malhotra",
+    "contact": {
+      "email": "manish.m@example.com",
+      "phone": "9876500001"
+    },
+    "address": {
+      "city": "Mumbai",
+      "pincode": "400001"
+    },
+    "kyc": {
+      "pan": "ABCDE1111A",
+      "status": "VERIFIED"
+    },
+    "orders": [
+      {
+        "order_id": "ORD-1",
+        "amount": 1500.0
+      }
+    ]
+  },
+  {
+    "customer_id": "JSON-002",
+    "full_name": "Sunita Williams",
+    "contact": {
+      "email": "sunita.w@example.com",
+      "phone": "9876500002"
+    },
+    "address": {
+      "city": "Ahmedabad",
+      "pincode": "380001"
+    },
+    "kyc": {
+      "pan": "BCDEF2222B",
+      "status": "PENDING"
+    },
+    "orders": [
+      {
+        "order_id": "ORD-2",
+        "amount": 2850.5
+      }
+    ]
+  },
+  {
+    "customer_id": "JSON-003",
+    "full_name": "Kunal Kamra",
+    "contact": {
+      "email": "kunal.k@example.com",
+      "phone": "9876500003"
+    },
+    "address": {
+      "city": "Delhi",
+      "pincode": "110001"
+    },
+    "kyc": {
+      "pan": "CDEFG3333C",
+      "status": "VERIFIED"
+    },
+    "orders": []
+  }
+]

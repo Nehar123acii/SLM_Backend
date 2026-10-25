@@ -1,17 +1,23 @@
 import json
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from backend.api.deps import get_db
 from backend.db.models import Dataset, Column, ETLIssue, IdentifierFinding, VersionDiff
 from backend.services.inventory import InventoryService
+from backend.etl.adapters import SUPPORTED_SOURCES
+from backend.etl.ocr_engine import OCRError
 from backend.schemas import (
     DatasetUploadResponse,
     DatasetListItemResponse,
     DatasetDetailResponse,
     IdentifierFindingResponse,
     VersionDiffResponse,
+    SupportedSourceResponse,
+    ConsolidatedInventoryResponse,
+    PrivacyAnalysisResponse,
+    AuditLogResponse,
 )
 
 # TODO: Add authentication & authorization layer before production deployment
@@ -19,23 +25,39 @@ from backend.schemas import (
 router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
 
 
+@router.get("/supported-sources", response_model=List[SupportedSourceResponse])
+def get_supported_sources():
+    """
+    Returns supported source types, formats, options, and descriptions for data ingestion.
+    """
+    return SUPPORTED_SOURCES
+
+
 @router.post("/upload", response_model=DatasetUploadResponse, status_code=status.HTTP_200_OK)
 async def upload_dataset(
     file: UploadFile = File(...),
+    source_type: Optional[str] = Form(None),
+    sheet_name: Optional[str] = Form(None),
+    language: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     """
-    Upload CSV/XLSX file, execute ETL pipeline, run mock AI column classification,
-    and persist results into database.
+    Upload file (CSV, Excel multi-sheet, Google Forms export, WhatsApp chat .txt, JSON,
+    selectable/scanned PDF, or PNG/JPEG/TIFF images), execute multi-source ETL pipeline,
+    run AI column classification, generate 5-category EDA, and persist results atomically.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename must be provided.")
 
     ext = "." + file.filename.split(".")[-1].lower() if "." in file.filename else ""
-    if ext not in [".csv", ".xlsx", ".xls"]:
+    valid_exts = [
+        ".csv", ".xlsx", ".xls", ".json", ".txt",
+        ".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
+    ]
+    if ext not in valid_exts:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file format '{ext}'. Only CSV and XLSX are allowed."
+            detail=f"Unsupported file format '{ext}'. Allowed formats: {', '.join(valid_exts)}."
         )
 
     content = await file.read()
@@ -44,9 +66,12 @@ async def upload_dataset(
             db=db,
             original_filename=file.filename,
             file_bytes=content,
+            source_type=source_type,
+            sheet_name=sheet_name,
+            language=language,
         )
         return result
-    except ValueError as ve:
+    except (ValueError, OCRError) as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process upload: {str(e)}")
@@ -70,12 +95,12 @@ def get_dataset(dataset_id: str, db: Session = Depends(get_db)):
     if not dataset:
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
 
-    # Parse identifier_flags in columns
     columns_data = []
     for c in dataset.columns:
         flags = json.loads(c.identifier_flags) if c.identifier_flags else []
         columns_data.append({
             "column_name": c.column_name,
+            "original_name": c.original_name,
             "inferred_type": c.inferred_type,
             "ai_category": c.ai_category,
             "ai_sensitivity": c.ai_sensitivity,
@@ -83,12 +108,18 @@ def get_dataset(dataset_id: str, db: Session = Depends(get_db)):
             "ai_explanation": c.ai_explanation,
             "dpdp_basis": c.dpdp_basis,
             "identifier_flags": flags,
+            "purpose": c.purpose,
+            "purpose_status": c.purpose_status,
         })
+
+    eda_summary = json.loads(dataset.eda_summary) if dataset.eda_summary else None
 
     return {
         "id": dataset.id,
         "dataset_id": dataset.dataset_id,
         "original_filename": dataset.original_filename,
+        "source_type": dataset.source_type,
+        "sheet_name": dataset.sheet_name,
         "version": dataset.version,
         "row_count": dataset.row_count,
         "accepted_count": dataset.accepted_count,
@@ -100,7 +131,24 @@ def get_dataset(dataset_id: str, db: Session = Depends(get_db)):
         "columns": columns_data,
         "etl_issues": dataset.etl_issues,
         "identifier_findings": dataset.identifier_findings,
+        "eda_summary": eda_summary,
     }
+
+
+@router.get("/datasets/{dataset_id}/eda-summary")
+def get_dataset_eda_summary(dataset_id: str, db: Session = Depends(get_db)):
+    """
+    Returns the complete 5-category EDA report for a dataset:
+    1. Dataset Overview
+    2. Completeness and Duplication
+    3. Numeric Distributions (measurements only)
+    4. Categorical Distributions (sensitive values redacted)
+    5. Time, Text and Data Quality
+    """
+    eda = InventoryService.get_eda_summary(db, dataset_id)
+    if not eda:
+        raise HTTPException(status_code=404, detail=f"EDA summary for dataset '{dataset_id}' not found.")
+    return eda
 
 
 @router.get("/datasets/{dataset_id}/identifier-findings", response_model=List[IdentifierFindingResponse])
@@ -135,6 +183,60 @@ def get_dataset_diff(dataset_id: str, db: Session = Depends(get_db)):
         "diff_json": diff_data,
         "created_at": diff.created_at,
     }
+
+
+@router.get("/consolidated", response_model=ConsolidatedInventoryResponse)
+def get_consolidated_inventory(db: Session = Depends(get_db)):
+    """
+    Retrieves unified inventory catalog across all ingested data sources,
+    including personal data category coverage matrix and unresolved cross-source matches.
+    """
+    return InventoryService.get_consolidated_inventory(db)
+
+
+@router.get("/consolidated/export")
+def export_consolidated_inventory(
+    format: str = Query("json", pattern="^(json|csv)$"),
+    db: Session = Depends(get_db),
+):
+    """
+    Exports the consolidated multi-source inventory catalog as JSON or CSV.
+    """
+    content = InventoryService.export_consolidated_inventory(db, export_format=format)
+    if format == "csv":
+        return Response(
+            content=content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=consolidated_inventory.csv"},
+        )
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=consolidated_inventory.json"},
+    )
+
+
+@router.get("/privacy-analysis", response_model=PrivacyAnalysisResponse)
+def get_privacy_analysis(db: Session = Depends(get_db)):
+    """
+    Retrieves case-specific privacy governance analyses:
+    - Smart Personal Data Mapper
+    - Privacy Leak Detector
+    - Privacy Request Manager
+    - Data Breach Response Assistant
+    """
+    return InventoryService.get_privacy_analysis(db)
+
+
+@router.get("/audit-logs", response_model=List[AuditLogResponse])
+def get_audit_logs(
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns administrative system audit logs. Strictly excludes raw personal data.
+    """
+    return InventoryService.get_audit_logs(db, limit=limit)
 
 
 @router.post("/datasets/{dataset_id}/approve", response_model=DatasetListItemResponse)

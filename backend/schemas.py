@@ -15,6 +15,7 @@ class ORMBase(BaseModel):
 # -------------------------------------------------------------
 class ColumnResponse(ORMBase):
     column_name: str
+    original_name: Optional[str] = None
     inferred_type: str
     ai_category: Optional[str] = None
     ai_sensitivity: Optional[str] = None
@@ -22,6 +23,8 @@ class ColumnResponse(ORMBase):
     ai_explanation: Optional[str] = None
     dpdp_basis: Optional[str] = None
     identifier_flags: Optional[Union[List[str], str]] = None
+    purpose: Optional[str] = None
+    purpose_status: Optional[str] = None
 
 
 class ETLIssueResponse(ORMBase):
@@ -42,6 +45,8 @@ class DatasetUploadResponse(BaseModel):
     dataset_id: str
     version: int
     filename: str
+    source_type: Optional[str] = "csv"
+    sheet_name: Optional[str] = None
     row_count: int
     accepted_count: int
     rejected_count: int
@@ -50,6 +55,7 @@ class DatasetUploadResponse(BaseModel):
     identifier_findings: List[IdentifierFindingResponse]
     columns: List[ColumnResponse]
     ai_result: Optional[Dict[str, Any]] = None
+    eda_summary: Optional[Dict[str, Any]] = None
     status: str
 
 
@@ -57,6 +63,8 @@ class DatasetListItemResponse(ORMBase):
     id: int
     dataset_id: str
     original_filename: str
+    source_type: Optional[str] = "csv"
+    sheet_name: Optional[str] = None
     version: int
     status: str
     row_count: int
@@ -68,6 +76,8 @@ class DatasetDetailResponse(ORMBase):
     id: int
     dataset_id: str
     original_filename: str
+    source_type: Optional[str] = "csv"
+    sheet_name: Optional[str] = None
     version: int
     row_count: int
     accepted_count: int
@@ -79,6 +89,7 @@ class DatasetDetailResponse(ORMBase):
     columns: List[ColumnResponse] = []
     etl_issues: List[ETLIssueResponse] = []
     identifier_findings: List[IdentifierFindingResponse] = []
+    eda_summary: Optional[Any] = None
 
 
 class VersionDiffResponse(ORMBase):
@@ -90,6 +101,41 @@ class VersionDiffResponse(ORMBase):
     unchanged_count: int
     diff_json: Any
     created_at: datetime
+
+
+class SupportedSourceResponse(BaseModel):
+    source_type: str
+    label: str
+    file_extensions: List[str]
+    description: str
+    options: List[str]
+
+
+class ConsolidatedInventoryResponse(BaseModel):
+    total_sources: int
+    total_columns: int
+    total_records: int
+    sources: List[Dict[str, Any]]
+    columns: List[Dict[str, Any]]
+    category_coverage_matrix: Dict[str, List[str]]
+    cross_source_matches: List[Dict[str, Any]]
+
+
+class AuditLogResponse(ORMBase):
+    id: int
+    timestamp: datetime
+    action: str
+    entity_type: str
+    entity_id: str
+    actor: str
+    details: Optional[str] = None
+
+
+class PrivacyAnalysisResponse(BaseModel):
+    smart_personal_data_mapper: Dict[str, Any]
+    privacy_leak_detector: Dict[str, Any]
+    privacy_requests_summary: Dict[str, Any]
+    breach_assistant_summary: Dict[str, Any]
 
 
 # -------------------------------------------------------------

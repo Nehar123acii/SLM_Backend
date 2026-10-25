@@ -120,8 +120,10 @@ def check_reproducibility():
                 rel = str(child.relative_to(BASE))
                 if child.suffix == ".xlsx":
                     wb = openpyxl.load_workbook(child, read_only=True, data_only=True)
-                    ws = wb.active
-                    initial_xlsx_cells[rel] = list(ws.iter_rows(values_only=True))
+                    sheet_data = {}
+                    for sname in wb.sheetnames:
+                        sheet_data[sname] = list(wb[sname].iter_rows(values_only=True))
+                    initial_xlsx_cells[rel] = sheet_data
                 else:
                     initial_hashes[rel] = md5(child)
                 
@@ -135,11 +137,12 @@ def check_reproducibility():
         assert actual_hash == expected_hash, f"Reproducibility failure in {rel_path}: expected {expected_hash}, got {actual_hash}"
 
     # Verify cell contents match exactly for xlsx files
-    for rel_path, expected_cells in initial_xlsx_cells.items():
+    for rel_path, expected_sheets in initial_xlsx_cells.items():
         wb = openpyxl.load_workbook(BASE / rel_path, read_only=True, data_only=True)
-        ws = wb.active
-        actual_cells = list(ws.iter_rows(values_only=True))
-        assert actual_cells == expected_cells, f"Reproducibility cell content failure in {rel_path}"
+        actual_sheets = {}
+        for sname in wb.sheetnames:
+            actual_sheets[sname] = list(wb[sname].iter_rows(values_only=True))
+        assert actual_sheets == expected_sheets, f"Reproducibility cell content failure in {rel_path}"
 
     print("      -> Generator produces 100% identical, deterministic outputs under seed 42.")
 

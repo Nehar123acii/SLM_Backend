@@ -6,6 +6,8 @@ from .models import (
     ETLIssue,
     IdentifierFinding,
     VersionDiff,
+    AuditLog,
+    CrossSourceMatch,
     PrivacyRequest,
     Incident,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "ETLIssue",
     "IdentifierFinding",
     "VersionDiff",
+    "AuditLog",
+    "CrossSourceMatch",
     "PrivacyRequest",
     "Incident",
 ]

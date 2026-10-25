@@ -6,7 +6,7 @@ import numpy as np
 NULL_STRINGS = {"", "null", "NULL", "N/A", "n/a", "NA", "-", "none", "NONE", "None"}
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 PHONE_IN_REGEX = re.compile(r"^(?:\+91[\-\s]?|91[\-\s]?|0)?[6-9]\d{9}$")
-URL_REGEX = re.compile(r"^(?:https?:\/\/)?(?:www\.)?[\w\-]+(\.[\w\-]+)+(?:[\/?#]\S*)?$")
+URL_REGEX = re.compile(r"^(?:https?:\/\/|www\.)[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)+(?:[\/?#]\S*)?$")
 BOOLEAN_SET = {"true", "false", "yes", "no", "1", "0", "t", "f", "y", "n"}
 
 

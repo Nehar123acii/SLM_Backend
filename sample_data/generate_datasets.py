@@ -1287,6 +1287,102 @@ def write_eda_summary(findings_list: list, whatsapp_findings: dict) -> None:
     print(f"  Written: {REPORTS / 'EDA_FINDINGS.md'}")
 
 
+def generate_multisheet_excel() -> dict:
+    """
+    Generates a multi-sheet Excel file with 2 sheets (Patients_Directory, Doctors_Roster).
+    """
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "Patients_Directory"
+    ws1.append(["patient_id", "patient_name", "phone", "email", "diagnosis_notes"])
+    ws1.append(["PAT-001", "Amitav Sen", "9811122334", "amitav.sen@example.com", "Routine health checkup"])
+    ws1.append(["PAT-002", "Bhavna Kulkarni", "9822233445", "bhavna.k@example.com", "Prescription renewal"])
+    ws1.append(["PAT-003", "Chetan Bhagat", "9833344556", "chetan.b@example.com", "Blood test follow-up"])
+
+    ws2 = wb.create_sheet(title="Doctors_Roster")
+    ws2.append(["doctor_id", "doctor_name", "department", "room_no", "phone"])
+    ws2.append(["DOC-101", "Dr. Radhika Sen", "Cardiology", "Room 301", "9844455667"])
+    ws2.append(["DOC-102", "Dr. Vikram Seth", "Neurology", "Room 302", "9855566778"])
+
+    out_p = RAW_MESSY / "multisheet_clinic.xlsx"
+    wb.save(out_p)
+    return {
+        "file": "multisheet_clinic.xlsx",
+        "sheets": ["Patients_Directory", "Doctors_Roster"],
+        "row_count": 5,
+        "column_count": 5,
+        "purpose": "Multi-sheet Excel workbook testing",
+    }
+
+
+def generate_nested_json() -> dict:
+    """
+    Generates a nested JSON file with contact, address, and kyc sub-objects.
+    """
+    records = [
+        {
+            "customer_id": "JSON-001",
+            "full_name": "Manish Malhotra",
+            "contact": {
+                "email": "manish.m@example.com",
+                "phone": "9876500001"
+            },
+            "address": {
+                "city": "Mumbai",
+                "pincode": "400001"
+            },
+            "kyc": {
+                "pan": "ABCDE1111A",
+                "status": "VERIFIED"
+            },
+            "orders": [{"order_id": "ORD-1", "amount": 1500.0}]
+        },
+        {
+            "customer_id": "JSON-002",
+            "full_name": "Sunita Williams",
+            "contact": {
+                "email": "sunita.w@example.com",
+                "phone": "9876500002"
+            },
+            "address": {
+                "city": "Ahmedabad",
+                "pincode": "380001"
+            },
+            "kyc": {
+                "pan": "BCDEF2222B",
+                "status": "PENDING"
+            },
+            "orders": [{"order_id": "ORD-2", "amount": 2850.5}]
+        },
+        {
+            "customer_id": "JSON-003",
+            "full_name": "Kunal Kamra",
+            "contact": {
+                "email": "kunal.k@example.com",
+                "phone": "9876500003"
+            },
+            "address": {
+                "city": "Delhi",
+                "pincode": "110001"
+            },
+            "kyc": {
+                "pan": "CDEFG3333C",
+                "status": "VERIFIED"
+            },
+            "orders": []
+        }
+    ]
+    out_p = RAW_MESSY / "customers_nested.json"
+    with open(out_p, "w", encoding="utf-8") as f:
+        json.dump(records, f, indent=2)
+    return {
+        "file": "customers_nested.json",
+        "row_count": len(records),
+        "column_count": 7,
+        "purpose": "Nested JSON document testing",
+    }
+
+
 # ===========================================================================
 # Main
 # ===========================================================================
@@ -1308,6 +1404,8 @@ def main():
     findings.append(generate_billing_messy())
     findings.append(generate_appointments_messy())
     findings.append(generate_customers_messy())
+    findings.append(generate_multisheet_excel())
+    findings.append(generate_nested_json())
 
     print("\n[2] Generating expected-clean reference fixtures …")
     generate_clean_fixtures()
