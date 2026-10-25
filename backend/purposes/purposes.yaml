@@ -1,0 +1,38 @@
+# Controlled vocabulary of business processing purposes under DPDP
+# Fields: id, label_key, label
+
+- id: appointment_booking
+  label_key: appointment_booking
+  label: "Appointment booking"
+
+- id: billing_payment
+  label_key: billing_payment
+  label: "Billing and payment"
+
+- id: tax_records
+  label_key: tax_records
+  label: "Tax and accounting records"
+
+- id: medical_care
+  label_key: medical_care
+  label: "Medical care and diagnostics"
+
+- id: employment_payroll
+  label_key: employment_payroll
+  label: "Employment and payroll"
+
+- id: marketing_offers
+  label_key: marketing_offers
+  label: "Marketing and promotional offers"
+
+- id: legal_obligation
+  label_key: legal_obligation
+  label: "Legal and compliance obligation"
+
+- id: security_fraud
+  label_key: security_fraud
+  label: "Security and fraud prevention"
+
+- id: other
+  label_key: other
+  label: "Other business purpose"

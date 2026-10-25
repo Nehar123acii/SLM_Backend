@@ -207,6 +207,7 @@ class InventoryService:
                         logger.warning("Version diff computation failed: %s", str(e))
 
             # 7. Persist to DB within transaction
+            from backend.services.purposes import infer_segment_from_filename
             dataset_obj = Dataset(
                 dataset_id=dataset_id,
                 original_filename=safe_name,
@@ -221,6 +222,7 @@ class InventoryService:
                 temp_file_path=staged_path,
                 eda_summary=json.dumps(eda_report),
                 metadata_json=json.dumps(source_meta),
+                segment=infer_segment_from_filename(safe_name),
             )
             db.add(dataset_obj)
             db.flush()

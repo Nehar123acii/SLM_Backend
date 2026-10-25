@@ -39,6 +39,7 @@ class Dataset(Base):
     temp_file_path = SAColumn(String(512), nullable=True)
     eda_summary = SAColumn(Text, nullable=True)  # JSON string of 5-category EDA report
     metadata_json = SAColumn(Text, nullable=True)  # JSON string of source-specific metadata
+    segment = SAColumn(String(32), nullable=True)  # patient | customer | staff
 
     columns = relationship("Column", back_populates="dataset", cascade="all, delete-orphan")
     etl_issues = relationship("ETLIssue", back_populates="dataset", cascade="all, delete-orphan")
@@ -273,7 +274,7 @@ class PurposeLink(Base):
     id = SAColumn(Integer, primary_key=True, autoincrement=True)
     column_id = SAColumn(Integer, ForeignKey("columns.id"), nullable=False, index=True)
     segment = SAColumn(String(32), nullable=False)  # patient | customer | staff
-    purpose_id = SAColumn(Integer, ForeignKey("purposes.id"), nullable=False, index=True)
+    purpose_id = SAColumn(Integer, ForeignKey("purposes.id"), nullable=True, index=True)
     status = SAColumn(String(32), nullable=False, default="inferred")  # confirmed | inferred | unknown
     answered_by = SAColumn(String(128), nullable=True)
     answered_at = SAColumn(DateTime, nullable=True)
