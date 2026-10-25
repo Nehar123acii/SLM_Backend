@@ -17,6 +17,9 @@ class ColumnResponse(ORMBase):
     column_name: str
     original_name: Optional[str] = None
     inferred_type: str
+    locator: Optional[str] = None
+    category: Optional[str] = None
+    impact_tier: Optional[str] = None
     ai_category: Optional[str] = None
     ai_sensitivity: Optional[str] = None
     ai_confidence: Optional[float] = None

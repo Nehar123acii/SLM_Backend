@@ -27,6 +27,12 @@ from backend.etl.identifier_checks import run_identifier_checks
 from backend.etl.reconciler import reconcile_datasets
 from backend.etl.eda import compute_complete_eda
 from backend.ai_client.mock_client import get_ai_client
+from backend.services.provenance import (
+    classify_column_category,
+    compute_impact_tier,
+    compute_locator,
+    resolve_entities_and_record_occurrences,
+)
 
 logger = logging.getLogger("inventory_service")
 
@@ -219,7 +225,8 @@ class InventoryService:
             db.add(dataset_obj)
             db.flush()
 
-            # Save columns with source lineage
+            # Save columns with source lineage and provenance
+            col_objs: Dict[str, Column] = {}
             for col_name, inferred_type in col_types.items():
                 ai_data = classifications.get(col_name, {})
                 flags = [
@@ -235,11 +242,30 @@ class InventoryService:
                     "HR & Payroll" if "salary" in col_name else "Customer Service / Communications"
                 )
 
+                # Provenance fields (category, impact_tier, locator)
+                col_category = classify_column_category(
+                    col_name=col_name,
+                    inferred_type=inferred_type,
+                    flags=flags,
+                    ai_data=ai_data,
+                )
+                col_impact_tier = compute_impact_tier(col_category)
+                col_locator = compute_locator(
+                    filename=safe_name,
+                    sheet_name=actual_sheet_name,
+                    col_name=col_name,
+                    source_type=resolved_source_type,
+                    source_meta=source_meta,
+                )
+
                 col_obj = Column(
                     dataset_id=dataset_id,
                     column_name=col_name,
                     original_name=orig_name,
                     inferred_type=inferred_type,
+                    locator=col_locator,
+                    category=col_category,
+                    impact_tier=col_impact_tier,
                     ai_category=ai_data.get("category"),
                     ai_sensitivity=ai_data.get("sensitivity"),
                     ai_confidence=ai_data.get("confidence"),
@@ -250,6 +276,18 @@ class InventoryService:
                     purpose_status=p_status,
                 )
                 db.add(col_obj)
+                col_objs[col_name] = col_obj
+
+            db.flush()
+
+            # Record identifier occurrences and perform entity resolution
+            resolve_entities_and_record_occurrences(
+                db=db,
+                dataset_id=dataset_id,
+                cleaned_df=cleaned_df,
+                col_objs=col_objs,
+                source_type=resolved_source_type,
+            )
 
             for iss in etl_issue_dicts:
                 db.add(ETLIssue(
@@ -322,6 +360,9 @@ class InventoryService:
                         "column_name": c.column_name,
                         "original_name": c.original_name,
                         "inferred_type": c.inferred_type,
+                        "locator": c.locator,
+                        "category": c.category,
+                        "impact_tier": c.impact_tier,
                         "ai_category": c.ai_category,
                         "ai_sensitivity": c.ai_sensitivity,
                         "ai_confidence": c.ai_confidence,
