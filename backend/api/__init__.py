@@ -9,6 +9,7 @@ from .erasure import erasure_router
 from .breach import router as breach_router
 from .rights import rights_router, cases_router
 from .graphs import router as graphs_router
+from .reports import router as reports_router
 
 __all__ = [
     "inventory_router",
@@ -23,4 +24,5 @@ __all__ = [
     "rights_router",
     "cases_router",
     "graphs_router",
+    "reports_router",
 ]

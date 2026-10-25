@@ -20,6 +20,7 @@ from backend.api import (
     rights_router,
     cases_router,
     graphs_router,
+    reports_router,
 )
 
 logging.basicConfig(
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(rights_router)
     app.include_router(cases_router)
     app.include_router(graphs_router)
+    app.include_router(reports_router)
 
     @app.get("/health", tags=["health"])
     def health_check():
