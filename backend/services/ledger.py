@@ -189,6 +189,12 @@ def verify_chain(session: Session) -> Dict[str, Any]:
     }
 
 
+def get_head_hash(session: Session) -> str:
+    """Returns the current head hash of the ledger (or genesis hash if empty)."""
+    last_event = session.query(LedgerEvent).order_by(LedgerEvent.seq.desc()).first()
+    return last_event.hash if last_event and last_event.hash else GENESIS_PREV_HASH
+
+
 def tamper_event(session: Session, seq: int) -> Dict[str, Any]:
     """Dev-only: modifies a stored payload without recomputing hash to demonstrate tamper detection."""
     ev = session.query(LedgerEvent).filter(LedgerEvent.seq == seq).first()

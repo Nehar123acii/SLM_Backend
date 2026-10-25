@@ -21,6 +21,7 @@ from .models import (
     BreachSimulation,
     EvidencePack,
     LedgerTamperBackup,
+    ErasurePlan,
 )
 
 __all__ = [
@@ -49,4 +50,5 @@ __all__ = [
     "BreachSimulation",
     "EvidencePack",
     "LedgerTamperBackup",
+    "ErasurePlan",
 ]

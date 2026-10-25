@@ -15,6 +15,7 @@ from backend.api import (
     ledger_router,
     evidence_router,
     flags_router,
+    erasure_router,
 )
 
 logging.basicConfig(
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(ledger_router)
     app.include_router(evidence_router)
     app.include_router(flags_router)
+    app.include_router(erasure_router, prefix="/api/erasure", tags=["erasure"])
 
     @app.get("/health", tags=["health"])
     def health_check():

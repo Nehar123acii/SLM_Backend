@@ -393,3 +393,25 @@ class LedgerTamperBackup(Base):
     type = SAColumn(String(64), nullable=False)
 
 
+class ErasurePlan(Base):
+    """
+    Erasure plan compiling field-level actions and receipts for data principals.
+    Never stores raw personal data: hashes, locators, and masked samples only.
+    """
+    __tablename__ = "erasure_plans"
+
+    id = SAColumn(String(64), primary_key=True)
+    person_id = SAColumn(Integer, ForeignKey("people.id"), nullable=False, index=True)
+    plan_hash = SAColumn(String(64), nullable=False)
+    status = SAColumn(String(32), nullable=False, default="plan_ready")  # plan_ready | approved | executed | blocked_identity
+    identity_resolution = SAColumn(String(32), nullable=False, default="strong")
+    identity_confirmed = SAColumn(Boolean, default=False, nullable=False)
+    plan_json = SAColumn(Text, nullable=False)
+    receipt_json = SAColumn(Text, nullable=True)
+    receipt_html_path = SAColumn(String(512), nullable=True)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+    executed_at = SAColumn(DateTime, nullable=True)
+
+    person = relationship("Person")
+
+
