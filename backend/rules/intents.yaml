@@ -1,0 +1,143 @@
+# Intent classification rules for DPDP rights requests
+# No LLM — pure keyword/regex matching
+intents:
+  erase:
+    keywords_en:
+      - "delete my details"
+      - "remove my details"
+      - "erase my details"
+      - "delete my data"
+      - "remove my data"
+      - "erase my data"
+      - "delete my record"
+      - "remove my record"
+      - "delete my number"
+      - "remove my number"
+      - "delete my name"
+      - "remove my name"
+      - "delete my email"
+      - "remove my email"
+      - "delete my address"
+      - "remove my address"
+      - "remove me from"
+      - "delete me from"
+      - "opt me out"
+      - "right to erasure"
+      - "right to be forgotten"
+    keywords_hinglish:
+      - "hata dijiye"
+      - "delete kar do"
+      - "delete kar dijiye"
+      - "mera number mat rakhiye"
+      - "mujhe list se hata"
+      - "meri details hata"
+      - "mera data delete"
+      - "mera record hata"
+      - "mujhe batao mere details"
+    keywords_kannada_latin:
+      - "delete maadi"
+      - "tegedu haaki"
+      - "nanna details beda"
+      - "nanna number delete"
+      - "nanna data delete"
+      - "nanna record delete"
+    # Personal-data objects required (if only delete/remove without object => check generic)
+    personal_data_objects:
+      - "number"
+      - "details"
+      - "data"
+      - "record"
+      - "name"
+      - "email"
+      - "address"
+      - "me"
+      - "my"
+      - "nanna"
+      - "mera"
+      - "meri"
+    # These delete targets are NOT erasure requests
+    false_positive_objects:
+      - "message"
+      - "report"
+      - "photo"
+      - "image"
+      - "file"
+      - "group"
+      - "chat"
+      - "post"
+
+  access:
+    keywords_en:
+      - "what details do you have"
+      - "what details you have"
+      - "what data do you have"
+      - "what data you have"
+      - "send me my details"
+      - "send me my data"
+      - "what information do you have about me"
+      - "what information you have about me"
+      - "share my details"
+      - "provide my details"
+      - "right to access"
+      - "data access request"
+    keywords_hinglish:
+      - "mujhe batao mere details"
+      - "meri details bhejo"
+      - "mera data batao"
+    keywords_kannada_latin: []
+
+  correct:
+    keywords_en:
+      - "wrong number"
+      - "wrong phone"
+      - "wrong email"
+      - "please update"
+      - "please correct"
+      - "update my"
+      - "correct my"
+      - "change my"
+      - "wrong details"
+      - "incorrect details"
+      - "right to correction"
+      - "right to rectification"
+    keywords_hinglish:
+      - "galat number hai"
+      - "update kar do"
+      - "sahi kar do"
+    keywords_kannada_latin: []
+
+  withdraw_consent:
+    keywords_en:
+      - "stop sending"
+      - "unsubscribe"
+      - "opt out"
+      - "withdraw consent"
+      - "revoke consent"
+      - "stop contacting"
+      - "do not contact"
+      - "remove from mailing"
+      - "stop reminders"
+      - "no more messages"
+    keywords_hinglish:
+      - "messages band karo"
+      - "msg band karo"
+      - "pareshan mat karo"
+      - "bar bar call mat karo"
+      - "message mat bhejo"
+    keywords_kannada_latin:
+      - "message beda"
+      - "call maada bedi"
+
+  complaint:
+    keywords_en:
+      - "file a complaint"
+      - "register a complaint"
+      - "raise a grievance"
+      - "data protection board"
+      - "complain to dpbi"
+      - "illegal data"
+      - "violation of privacy"
+    keywords_hinglish:
+      - "shikayat darj"
+      - "complaint karna hai"
+    keywords_kannada_latin: []

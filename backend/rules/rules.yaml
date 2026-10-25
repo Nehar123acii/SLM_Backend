@@ -1,0 +1,162 @@
+# 12 DPDP Readiness Rules for Kavach
+# Fields: id, title, citation_hint, trigger, remediation, severity, verify, verified, source_url
+
+- id: "health_data_safeguards"
+  title: "Health data security safeguards"
+  citation_hint: "s.8(5) security safeguards"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Deploy robust encryption in transit and at rest, strict role-based access control, and complete audit logging for health and diagnostic records."
+  trigger:
+    fact: "has_health_data"
+    operator: "=="
+    value: true
+
+- id: "aadhaar_in_chat"
+  title: "Aadhaar present in WhatsApp/chat or free text"
+  citation_hint: "s.8(5) security safeguards"
+  severity: "critical"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Cease receiving or storing unmasked Aadhaar numbers in WhatsApp chat exports. Immediately purge or mask existing Aadhaar instances."
+  trigger:
+    fact: "has_aadhaar_in_chat"
+    operator: "=="
+    value: true
+
+- id: "aadhaar_multiple_files"
+  title: "Aadhaar stored in more than one file"
+  citation_hint: "s.8(7) erasure/retention"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Consolidate Aadhaar records into a single restricted repository and delete redundant Aadhaar data from billing, forms, and general spreadsheets."
+  trigger:
+    fact: "aadhaar_source_count"
+    operator: ">"
+    value: 1
+
+- id: "unrestricted_shared_source"
+  title: "Personal data in an unrestricted shared source"
+  citation_hint: "s.8(5) security safeguards"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Move customer and patient spreadsheets from open, unmanaged personal channels or drives into password-protected, encrypted business storage."
+  trigger:
+    fact: "personal_phones"
+    operator: "=="
+    value: "yes"
+
+- id: "minors_parental_consent"
+  title: "Possible minors present, parental consent needed"
+  citation_hint: "s.9 children"
+  severity: "critical"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Obtain verifiable consent from parent or lawful guardian before processing personal data of individuals under 18 years of age."
+  trigger:
+    any:
+      - fact: "has_minors"
+        operator: "=="
+        value: true
+      - fact: "children_served"
+        operator: "=="
+        value: "yes"
+
+- id: "employee_data_lawful_basis"
+  title: "Employee data processing lawful basis"
+  citation_hint: "s.7(i) employment"
+  severity: "low"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Employee data processing is recognized under s.7(i) for employment purposes without requiring separate consent; maintain confidentiality and provide privacy notice to staff."
+  trigger:
+    fact: "has_employee_data"
+    operator: "=="
+    value: true
+
+- id: "notice_at_collection"
+  title: "No notice at collection points"
+  citation_hint: "s.5 notice"
+  severity: "med"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Provide clear privacy notice at all collection touchpoints (e.g., prominent signage for CCTV cameras and privacy terms on registration forms)."
+  trigger:
+    fact: "cctv"
+    operator: "=="
+    value: "yes"
+
+- id: "breach_contact_process"
+  title: "No breach contact/process"
+  citation_hint: "s.8(6) breach intimation"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Formulate a formal breach response plan and publish a designated breach point of contact to intimate the Data Protection Board and affected principals."
+  trigger:
+    fact: "breach_contact"
+    operator: "=="
+    value: "no"
+
+- id: "retention_policy"
+  title: "No retention policy"
+  citation_hint: "s.8(7) erasure/retention"
+  severity: "med"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Establish a documented retention policy to periodically erase personal data once diagnostic, billing, or statutory purposes are completed."
+  trigger:
+    fact: "retention_policy"
+    operator: "=="
+    value: "no"
+
+- id: "data_on_personal_phones"
+  title: "Data on personal phones"
+  citation_hint: "s.8(5) security safeguards"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Enforce policy prohibiting storage of unencrypted customer/patient files on personal mobile devices; migrate staff to managed enterprise channels."
+  trigger:
+    fact: "personal_phones"
+    operator: "=="
+    value: "yes"
+
+- id: "vendors_unwritten_agreement"
+  title: "Vendors/processors without written agreement"
+  citation_hint: "s.8(2) processors"
+  severity: "high"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Execute formal Data Processing Agreements (DPAs) with all outsourced diagnostic labs, cloud providers, and IT software vendors."
+  trigger:
+    fact: "vendors"
+    operator: "=="
+    value: "yes"
+
+- id: "data_sprawl_files"
+  title: "Same person data in many files (data sprawl)"
+  citation_hint: "ss.11-14 rights"
+  severity: "med"
+  verify: true
+  verified: false
+  source_url: ""
+  remediation: "Link and consolidate fragmented customer records across different files to support reliable fulfillment of erasure and correction rights."
+  trigger:
+    fact: "data_sprawl"
+    operator: "=="
+    value: true

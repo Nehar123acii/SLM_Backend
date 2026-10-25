@@ -1,0 +1,66 @@
+# Retention/erasure policy per source for customer/patient erasure requests
+# decisions: ERASE | MASK | RETAIN | REVIEW
+# verify: true means output must be reviewed by a human before execution
+
+sources:
+  appointments_form.csv:
+    default_decision: ERASE
+    reason_code: APPT_ERASE
+    citation_hint: "DPDP Act s.6(4) – data no longer necessary for purpose"
+    verify: true
+    verified: false
+    fields:
+      Timestamp: {decision: ERASE, reason_code: APPT_ERASE, citation_hint: "row sent by data principal, no longer needed", verify: true, verified: false}
+      Name: {decision: ERASE, reason_code: APPT_ERASE, verify: true, verified: false}
+      Phone: {decision: ERASE, reason_code: APPT_ERASE, verify: true, verified: false}
+      Email: {decision: ERASE, reason_code: APPT_ERASE, verify: true, verified: false}
+      Reason: {decision: ERASE, reason_code: APPT_ERASE, verify: true, verified: false}
+    notes: "Erase entire row sent by the data principal"
+
+  whatsapp_chat.txt:
+    default_decision: ERASE
+    reason_code: CHAT_ERASE
+    citation_hint: "DPDP Act s.6(4) – chat lines sent by data principal"
+    verify: true
+    verified: false
+    notes: "Erase lines SENT by the data principal; mask identifiers appearing in other people's lines"
+    sent_by_principal: ERASE
+    identifiers_in_others_lines: MASK
+
+  patients.xlsx:
+    default_decision: RETAIN
+    reason_code: PATIENT_RETAIN_REVIEW
+    citation_hint: "DPDP Act s.7(i) – medical records; verify retention period with medical professional"
+    verify: true
+    verified: false
+    fields:
+      Phone: {decision: ERASE, reason_code: PATIENT_ID_ERASE, citation_hint: "identifier; no legal basis for retention", verify: true, verified: false}
+      Email: {decision: ERASE, reason_code: PATIENT_ID_ERASE, citation_hint: "identifier; no legal basis for retention", verify: true, verified: false}
+      Aadhaar: {decision: ERASE, reason_code: PATIENT_ID_ERASE, citation_hint: "identifier; no legal basis for retention", verify: true, verified: false}
+      DOB: {decision: ERASE, reason_code: PATIENT_ID_ERASE, citation_hint: "identifier; no legal basis for retention", verify: true, verified: false}
+      Name: {decision: ERASE, reason_code: PATIENT_ID_ERASE, citation_hint: "identifier; no legal basis for retention", verify: true, verified: false}
+      test_name: {decision: RETAIN, reason_code: MEDICAL_RECORD_RETAIN, citation_hint: "medical record retention, needs professional review (verify)", verify: true, verified: false}
+      notes: {decision: RETAIN, reason_code: MEDICAL_RECORD_RETAIN, citation_hint: "medical record retention, needs professional review (verify)", verify: true, verified: false}
+      Test Name: {decision: RETAIN, reason_code: MEDICAL_RECORD_RETAIN, citation_hint: "medical record retention, needs professional review (verify)", verify: true, verified: false}
+      Notes: {decision: RETAIN, reason_code: MEDICAL_RECORD_RETAIN, citation_hint: "medical record retention, needs professional review (verify)", verify: true, verified: false}
+
+  billing.csv:
+    default_decision: RETAIN
+    reason_code: BILLING_RETAIN
+    citation_hint: "Tax/accounting record retention, verify period (typically 7 years)"
+    verify: true
+    verified: false
+    fields:
+      invoice_no: {decision: RETAIN, reason_code: BILLING_RETAIN, citation_hint: "tax/accounting record retention, verify period", verify: true, verified: false}
+      amount: {decision: RETAIN, reason_code: BILLING_RETAIN, citation_hint: "tax/accounting record retention, verify period", verify: true, verified: false}
+      gstin: {decision: RETAIN, reason_code: BILLING_RETAIN, citation_hint: "tax/accounting record retention, verify period", verify: true, verified: false}
+      patient_name: {decision: RETAIN, reason_code: BILLING_RETAIN, citation_hint: "tax/accounting record retention, verify period", verify: true, verified: false}
+      phone: {decision: MASK, reason_code: BILLING_PHONE_MASK, citation_hint: "phone not required for tax records; mask to reduce risk", verify: true, verified: false}
+
+  staff.csv:
+    default_decision: RETAIN
+    reason_code: STAFF_RETAIN
+    citation_hint: "Employment basis DPDP Act s.7(i); outside scope of customer erasure request"
+    verify: true
+    verified: false
+    notes: "Staff records are outside scope of customer/patient erasure requests"

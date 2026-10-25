@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     ocr_min_native_text_chars: int = 50
     ocr_min_native_words: int = 5
 
+    # Statutory DPDP constants
+    response_days: int = 30
+    breach_stage_2_hours: int = 72
+
     def model_post_init(self, __context: object) -> None:
         if "KAVACH_DATA_DIR" in os.environ:
             self.kavach_data_dir = os.environ["KAVACH_DATA_DIR"]
@@ -58,3 +62,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Statutory DPDP constants
+# UNVERIFIED, shown as "verify" in the UI
+RESPONSE_DAYS: int = 30
+
+# Statutory breach notification timeline constants under DPDP
+# The first Board intimation is "without delay": no number
+BREACH_STAGE_1_DESCRIPTION: str = "without delay"
+BREACH_STAGE_2_HOURS: int = 72

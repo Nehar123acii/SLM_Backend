@@ -323,3 +323,60 @@ class BusinessState(Base):
     last_activity = SAColumn(DateTime, nullable=True)
     created_at = SAColumn(DateTime, default=utc_now, nullable=False)
 
+
+class QuestionnaireAnswer(Base):
+    """
+    Questionnaire answers for operational DPDP readiness assessment.
+    Stores operational readiness keys and responses only.
+    """
+    __tablename__ = "questionnaire"
+
+    key = SAColumn(String(64), primary_key=True)
+    answer = SAColumn(String(32), nullable=False)
+
+
+class BreachSimulation(Base):
+    """
+    Simulated breach scenarios and statutory DPDP notification drafts.
+    Stores aggregated counts, scenario parameters, and anonymized draft templates only (never raw personal values).
+    """
+    __tablename__ = "breach_simulations"
+
+    id = SAColumn(Integer, primary_key=True, autoincrement=True)
+    scenario = SAColumn(String(128), nullable=False)
+    aware_at = SAColumn(DateTime, nullable=False)
+    device_protected = SAColumn(String(32), nullable=False)
+    severity = SAColumn(String(32), nullable=False)
+    counts_json = SAColumn(Text, nullable=False)
+    drafts_json = SAColumn(Text, nullable=False)
+    created_at = SAColumn(DateTime, default=utc_now, nullable=False)
+
+
+class EvidencePack(Base):
+    """
+    Compliance audit evidence packages with ledger head hashes and validation status.
+    """
+    __tablename__ = "evidence_packs"
+
+    pack_id = SAColumn(String(128), primary_key=True)
+    created_at = SAColumn(String(64), nullable=False)
+    head_hash = SAColumn(String(64), nullable=False)
+    score = SAColumn(Integer, nullable=False)
+    chain_ok = SAColumn(Integer, nullable=False)
+    path = SAColumn(String(512), nullable=False)
+
+
+class LedgerTamperBackup(Base):
+    """
+    Backup snapshot of a ledger event prior to a simulated tamper test, enabling repair demo.
+    """
+    __tablename__ = "ledger_tamper_backup"
+
+    id = SAColumn(Integer, primary_key=True)
+    payload_json = SAColumn(Text, nullable=False)
+    prev_hash = SAColumn(String(64), nullable=False)
+    hash = SAColumn(String(64), nullable=False)
+    ts = SAColumn(String(64), nullable=False)
+    type = SAColumn(String(64), nullable=False)
+
+

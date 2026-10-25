@@ -1,0 +1,84 @@
+# DPDP Breach Blast-Radius Simulation Scenarios
+# Fields: id, title, description, affected_sources, exposure_types, first_hour_checklist
+
+- id: "owner_phone_stolen"
+  title: "Owner phone stolen"
+  description: "Business owner's mobile device containing WhatsApp client chats, customer records, and informal messages was stolen."
+  affected_sources:
+    - "whatsapp_chat.txt"
+  exposure_types:
+    - "confidentiality"
+  first_hour_checklist:
+    - "Contact telecom provider immediately to block the SIM card and prevent OTP interception."
+    - "Trigger remote lock and remote wipe commands via Google Find My Device or Apple Find My."
+    - "Revoke active WhatsApp Web sessions and deregister WhatsApp account on the stolen device."
+    - "Log out of business email, cloud storage, and banking sessions connected to the phone."
+    - "File a formal loss report or e-FIR at the nearest police station and obtain an acknowledgment copy."
+    - "Record the exact time of loss and discovery to establish the statutory DPDP incident clock."
+    - "Brief the internal response team and prepare preliminary Section 8(6) intimation to the Board."
+
+- id: "billing_laptop_ransomware"
+  title: "Billing laptop ransomware"
+  description: "Ransomware infection encrypted the billing department laptop, compromising patient billing records and patient details availability and confidentiality."
+  affected_sources:
+    - "billing.csv"
+    - "patients.xlsx"
+  exposure_types:
+    - "confidentiality"
+    - "availability"
+  first_hour_checklist:
+    - "Disconnect the infected billing laptop immediately from office Wi-Fi, Ethernet, and local network."
+    - "Do not power off; preserve RAM and disk state, taking photos or notes of the ransom message."
+    - "Do not communicate with attackers or pay the ransom demand."
+    - "Verify integrity of isolated offline backups and confirm secondary storage was not infected."
+    - "Change admin passwords and credentials across all connected accounting portals and shared systems."
+    - "Investigate whether data exfiltration tools ran alongside the file-encrypting payload."
+    - "Start the 72-hour reporting clock from the moment the ransomware screen was discovered."
+    - "Prepare the urgent Section 8(6) intimation to the Data Protection Board regarding health and billing data."
+
+- id: "public_form_link_leaked"
+  title: "Public form link leaked"
+  description: "A public Google Forms / web appointments sheet was exposed with view or edit permissions open to the internet without authentication."
+  affected_sources:
+    - "appointments_form.csv"
+  exposure_types:
+    - "confidentiality"
+  first_hour_checklist:
+    - "Change form and linked spreadsheet access permissions from 'Anyone with the link' to 'Restricted'."
+    - "Regenerate form submission URLs and rotate connected webhook or spreadsheet API access tokens."
+    - "Inspect access and download audit logs to determine unauthorized IP addresses and access counts."
+    - "Determine the exact duration of public exposure between initial link creation and lockdown."
+    - "Export a snapshot of affected appointment entries to confirm impacted client identities."
+    - "Record awareness timestamp to start regulatory intimation clocks."
+    - "Prepare tailored individual notifications advising clients to watch for imposter scheduling calls."
+
+- id: "staff_laptop_lost"
+  title: "Staff laptop lost"
+  description: "A staff member lost a work laptop during transit, containing employee records, PAN cards, and payroll bank details."
+  affected_sources:
+    - "staff.csv"
+  exposure_types:
+    - "confidentiality"
+  first_hour_checklist:
+    - "Interview the employee to confirm last known location, transit route, and laptop security status."
+    - "Attempt remote lock or remote wipe via corporate MDM or Microsoft Intune if configured."
+    - "Revoke employee corporate account passwords, SSO tokens, and VPN certificates immediately."
+    - "Verify whether full-disk encryption (BitLocker) was active and enforced on the lost machine."
+    - "File an e-FIR / police loss complaint for property tracking and legal documentation."
+    - "Assess exposure of employee financial data (PAN, bank accounts) for potential payroll fraud."
+    - "Log incident discovery time and prepare notification for the Data Protection Board."
+
+- id: "custom"
+  title: "Custom scenario"
+  description: "Custom breach blast-radius simulation with user-selected source files."
+  affected_sources: []
+  exposure_types:
+    - "confidentiality"
+  first_hour_checklist:
+    - "Identify and isolate all affected systems, databases, and physical devices immediately."
+    - "Revoke compromised credentials, administrative access, and active user sessions."
+    - "Preserve system access logs, firewalls, and audit trails for forensic analysis."
+    - "Determine the exact time of breach discovery to start the 72-hour DPDP clock."
+    - "Extract inventory of affected records and categories of sensitive personal data."
+    - "Submit initial intimation to the Data Protection Board of India without delay."
+    - "Prepare and issue transparent advisory notices to all affected data principals."
