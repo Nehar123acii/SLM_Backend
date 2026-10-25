@@ -1,5 +1,5 @@
 # 12 DPDP Readiness Rules for Kavach
-# Fields: id, title, citation_hint, trigger, remediation, severity, verify, verified, source_url
+# Fields: id, title, citation_hint, severity, verify, verified, whats_right, whats_not, how_to_fix, fix_action, trigger
 
 - id: "health_data_safeguards"
   title: "Health data security safeguards"
@@ -8,9 +8,12 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Deploy robust encryption in transit and at rest, strict role-based access control, and complete audit logging for health and diagnostic records."
+  whats_right: "No issue found by Kavach's checks: Health data is mapped to confirmed medical care purposes with safeguards."
+  whats_not: "Health and diagnostic records detected without confirmed legal purpose or verified safeguards."
+  how_to_fix: "Deploy robust encryption at rest and in transit, restrict access to authorized clinicians, and confirm the medical care purpose."
+  fix_action: "review_columns"
   trigger:
-    fact: "has_health_data"
+    fact: "has_unsecured_health_data"
     operator: "=="
     value: true
 
@@ -21,7 +24,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Cease receiving or storing unmasked Aadhaar numbers in WhatsApp chat exports. Immediately purge or mask existing Aadhaar instances."
+  whats_right: "No issue found by Kavach's checks: Chat channels verified free of unmasked Aadhaar numbers."
+  whats_not: "Unmasked Aadhaar numbers detected in exported WhatsApp chat conversations or unstructured notes."
+  how_to_fix: "Immediately purge or redact unmasked Aadhaar numbers from chat channels and mandate masking in communications."
+  fix_action: "review_columns"
   trigger:
     fact: "has_aadhaar_in_chat"
     operator: "=="
@@ -34,7 +40,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Consolidate Aadhaar records into a single restricted repository and delete redundant Aadhaar data from billing, forms, and general spreadsheets."
+  whats_right: "No issue found by Kavach's checks: Aadhaar data is consolidated in a single restricted file."
+  whats_not: "Aadhaar numbers are duplicated across multiple disparate spreadsheets or forms."
+  how_to_fix: "Consolidate Aadhaar records into one designated repository and execute an erasure plan for redundant files."
+  fix_action: "erasure_plan"
   trigger:
     fact: "aadhaar_source_count"
     operator: ">"
@@ -47,7 +56,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Move customer and patient spreadsheets from open, unmanaged personal channels or drives into password-protected, encrypted business storage."
+  whats_right: "No issue found by Kavach's checks: Personal data restricted to managed enterprise storage."
+  whats_not: "Customer or patient data is accessible via unmanaged shared personal devices or personal drives."
+  how_to_fix: "Migrate all customer spreadsheets to password-protected enterprise cloud storage with access logging."
+  fix_action: "questionnaire"
   trigger:
     fact: "personal_phones"
     operator: "=="
@@ -60,15 +72,14 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Obtain verifiable consent from parent or lawful guardian before processing personal data of individuals under 18 years of age."
+  whats_right: "No issue found by Kavach's checks: No unconsented processing of children's personal data identified."
+  whats_not: "Records of individuals under 18 years of age processed without verifiable parental or guardian consent."
+  how_to_fix: "Implement verifiable parental consent verification prior to processing personal data of children."
+  fix_action: "review_columns"
   trigger:
-    any:
-      - fact: "has_minors"
-        operator: "=="
-        value: true
-      - fact: "children_served"
-        operator: "=="
-        value: "yes"
+    fact: "has_minors"
+    operator: "=="
+    value: true
 
 - id: "employee_data_lawful_basis"
   title: "Employee data processing lawful basis"
@@ -77,9 +88,12 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Employee data processing is recognized under s.7(i) for employment purposes without requiring separate consent; maintain confidentiality and provide privacy notice to staff."
+  whats_right: "No issue found by Kavach's checks: Employee records mapped to recognized employment lawful basis."
+  whats_not: "Staff records lack confirmed employment purpose documentation or privacy notice."
+  how_to_fix: "Document employment purpose for staff records under Section 7(i) and issue staff privacy notices."
+  fix_action: "answer_question"
   trigger:
-    fact: "has_employee_data"
+    fact: "unconfirmed_staff_data"
     operator: "=="
     value: true
 
@@ -90,7 +104,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Provide clear privacy notice at all collection touchpoints (e.g., prominent signage for CCTV cameras and privacy terms on registration forms)."
+  whats_right: "No issue found by Kavach's checks: No unnotified collection touchpoints identified."
+  whats_not: "CCTV or intake collection points operate without visible, plain-language privacy notices."
+  how_to_fix: "Place prominent signage near CCTV cameras and add collection notices on registration forms."
+  fix_action: "questionnaire"
   trigger:
     fact: "cctv"
     operator: "=="
@@ -103,7 +120,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Formulate a formal breach response plan and publish a designated breach point of contact to intimate the Data Protection Board and affected principals."
+  whats_right: "No issue found by Kavach's checks: Designated breach contact person and notification procedure established."
+  whats_not: "No designated contact person or incident process to intimate the Board and affected people without delay."
+  how_to_fix: "Designate a privacy/breach officer, document notification workflows, and review the breach checklist."
+  fix_action: "breach_checklist"
   trigger:
     fact: "breach_contact"
     operator: "=="
@@ -116,7 +136,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Establish a documented retention policy to periodically erase personal data once diagnostic, billing, or statutory purposes are completed."
+  whats_right: "No issue found by Kavach's checks: Written data retention and scheduled disposal policy documented."
+  whats_not: "No written policy exists to periodically erase personal data once legal and business purposes expire."
+  how_to_fix: "Adopt a data retention schedule and implement regular erasure cycles for expired records."
+  fix_action: "erasure_plan"
   trigger:
     fact: "retention_policy"
     operator: "=="
@@ -129,7 +152,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Enforce policy prohibiting storage of unencrypted customer/patient files on personal mobile devices; migrate staff to managed enterprise channels."
+  whats_right: "No issue found by Kavach's checks: Staff prohibited from holding customer records on personal phones."
+  whats_not: "Staff, doctors, or contractors retain unencrypted customer files or chat backups on personal devices."
+  how_to_fix: "Enforce a formal mobile device policy requiring enterprise accounts and prohibiting local storage on personal phones."
+  fix_action: "questionnaire"
   trigger:
     fact: "personal_phones"
     operator: "=="
@@ -142,7 +168,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Execute formal Data Processing Agreements (DPAs) with all outsourced diagnostic labs, cloud providers, and IT software vendors."
+  whats_right: "No issue found by Kavach's checks: Written Data Processing Agreements executed with all processors."
+  whats_not: "Personal data shared with third-party labs, IT software, or contractors without binding written DPAs."
+  how_to_fix: "Execute written Data Processing Agreements defining processing duties with every external vendor."
+  fix_action: "questionnaire"
   trigger:
     fact: "vendors"
     operator: "=="
@@ -155,7 +184,10 @@
   verify: true
   verified: false
   source_url: ""
-  remediation: "Link and consolidate fragmented customer records across different files to support reliable fulfillment of erasure and correction rights."
+  whats_right: "No issue found by Kavach's checks: Entity profiles consolidated with no excessive file sprawl."
+  whats_not: "Individual data subjects are fragmented across three or more separate spreadsheets or systems."
+  how_to_fix: "Unify duplicate customer records and archive obsolete copies using an erasure plan."
+  fix_action: "erasure_plan"
   trigger:
     fact: "data_sprawl"
     operator: "=="

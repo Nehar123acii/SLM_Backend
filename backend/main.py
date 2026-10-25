@@ -14,6 +14,7 @@ from backend.api import (
     purposes_router,
     ledger_router,
     evidence_router,
+    flags_router,
 )
 
 logging.basicConfig(
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(purposes_router, prefix="/api/v1")
     app.include_router(ledger_router)
     app.include_router(evidence_router)
+    app.include_router(flags_router)
 
     @app.get("/health", tags=["health"])
     def health_check():

@@ -4,6 +4,7 @@ from .incidents import router as incidents_router
 from .purposes import router as purposes_router
 from .ledger import router as ledger_router
 from .evidence import router as evidence_router
+from .rules import router as flags_router
 
 __all__ = [
     "inventory_router",
@@ -12,4 +13,5 @@ __all__ = [
     "purposes_router",
     "ledger_router",
     "evidence_router",
+    "flags_router",
 ]
